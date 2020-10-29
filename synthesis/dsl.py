@@ -122,7 +122,7 @@ class Scheme:
         print(out)
         out = out.split()
         solved, rtime = int(out[0]), float(out[-1][:-1])
-        return solved, rtime, solved ** 2 + 100 / rtime  # todo
+        return solved, rtime, 30 * solved ** 2 + 60 / rtime  # todo
 
     def update(self, new_tree):
         self.tree = new_tree
@@ -131,7 +131,10 @@ class Scheme:
 
 
 class DSL:
-    def __init__(self, meta_parser, grammar_file):
+    def __init__(self, meta_parser, grammar_file, wt, OP_prob):
+        self.grammar_file = grammar_file
+        self.wt = wt
+        self.OP_prob = OP_prob
         with open(grammar_file) as grammar:
             self.parser = Lark(grammar)
         with open(grammar_file) as grammar:
@@ -189,8 +192,16 @@ class DSL:
             return sample
         elif parse_tree.data == 'expansions':
             expansions = parse_tree.children
+            wt_lst = []
+            for c in expansions:
+                cur = 1
+                for token in c.children:
+                    if type(token) == Token and token in self.wt:
+                        cur += self.wt[token]
+                wt_lst.append(cur)
             for i in range(100):
-                n = random.randrange(len(expansions))
+                # n = random.randrange(len(expansions))
+                n = random.choices(range(len(expansions)), weights=wt_lst)[0]
                 substr = self.__gen_random_dsl(expansions[n], depth - 1)
                 if substr is not None:
                     return substr
@@ -199,8 +210,8 @@ class DSL:
             OP = parse_tree.children[-1]
             assert OP.type == 'OP'
             if '?' in OP:
-                coin = random.randint(0, 1)
-                if coin:
+                coin = random.random()
+                if coin < self.OP_prob:
                     return self.__gen_random_dsl(parse_tree.children[0], depth - 1)
                 else:
                     return ''
@@ -210,7 +221,7 @@ class DSL:
     def __gen_random_tree(self, rule, depth, is_token=False):
         dsl_str = self.__gen_random_dsl(rule, depth)
 
-        with open("expr.bnf") as grammar:
+        with open(self.grammar_file) as grammar:
             parser = Lark(grammar)
             if is_token:
                 ret = parser.parse(dsl_str).children[0]
@@ -221,7 +232,7 @@ class DSL:
                 # print('GEN', name, ret)
             return ret
 
-    def mutate(self, parse_tree, rate):
+    def mutate(self, parse_tree, rate, depth):
         if random.random() > rate:
             return parse_tree
         if type(parse_tree) == Token:
@@ -232,12 +243,12 @@ class DSL:
 
         assert type(parse_tree) == Tree
 
-        p_stop = 0.3  # todo
+        p_stop = depth / (depth + 5)  # todo: prob to mutate current node
         if random.random() < p_stop and parse_tree.data != 'start':
             return self.__gen_random_tree(self.rule_dict[parse_tree.data.lstrip('?!')], 10)
 
         rand_child_index = random.randrange(len(parse_tree.children))
-        parse_tree.children[rand_child_index] = self.mutate(parse_tree.children[rand_child_index], 1)
+        parse_tree.children[rand_child_index] = self.mutate(parse_tree.children[rand_child_index], 1, depth + 1)
         return parse_tree
 
     @staticmethod
@@ -392,7 +403,7 @@ class GP:
     def __init__(self, cfg):
         with open(cfg.meta_file) as meta_grammar:
             meta_parser = Lark(meta_grammar)
-        self.dsl = DSL(meta_parser, cfg.grammar_file)
+        self.dsl = DSL(meta_parser, cfg.grammar_file, cfg.wt, cfg.OP_prob)
         self.population = []
         self.generation = 0
         self.pop_size = cfg.pop_size
@@ -443,7 +454,7 @@ class GP:
         return deepcopy(temp_tournament[0]), deepcopy(temp_tournament[1])
 
     def __mutate(self, scheme):
-        scheme.update(self.dsl.mutate(scheme.tree), self.mutation_rate)
+        scheme.update(self.dsl.mutate(scheme.tree, self.mutation_rate, 0))
 
     def __crossover(self, scheme_0, scheme_1):
         return self.dsl.crossover(scheme_0.tree, scheme_1.tree, 1)
@@ -452,6 +463,10 @@ class GP:
         ta = self.dsl.gen_random_scheme('heuristic', 15)
         tb = self.dsl.gen_random_scheme('heuristic', 15)
         self.__crossover(ta, tb)
+
+    def test_gen_random(self):
+        s = self.dsl.gen_random_scheme('heuristic', self.depth_lim)
+        print(s.code)
 
 
 def run_gp():
@@ -468,4 +483,6 @@ def run_gp():
 
 if __name__ == '__main__':
     random.seed(Config.seed)
-    run_gp()
+    # run_gp()
+    gp = GP(Config)
+    gp.test_gen_random()
