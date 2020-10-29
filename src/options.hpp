@@ -134,6 +134,7 @@ OPTION( restartreusetrail, 1,  0,  1,0,0,1, "enable trail reuse") \
 OPTION( restoreall,        0,  0,  2,0,0,1, "restore all clauses (2=really)") \
 OPTION( restoreflush,      0,  0,  1,0,0,1, "remove satisfied clauses") \
 OPTION( reverse,           0,  0,  1,0,0,1, "reverse variable ordering") \
+OPTION( scheme,            0,  0,  5,0,0,1, "scoring scheme")          \
 OPTION( score,             1,  0,  1,0,0,1, "use EVSIDS scores") \
 OPTION( scorefactor,     950,500,1e3,0,0,1, "score factor per mille") \
 OPTION( seed,              0,  0,2e9,0,0,1, "random seed") \

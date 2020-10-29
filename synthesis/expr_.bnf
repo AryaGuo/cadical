@@ -1,0 +1,100 @@
+start: heuristic
+    | assign_unbumped
+    | assign_new_score
+    | assign_score_inc
+    | new_score_expr
+    | ns_sum
+    | ns_prod
+    | ns_exp
+    | unbumped_expr
+    | ub_prod
+    | ub_exp
+    | score_inc_expr
+    | inc_sum
+    | inc_prod
+    | inc_exp
+    | bool_expr
+    | bool_sum
+    | bool_prod
+    | bool_exp
+    | condition
+    | bool
+    | bool_opr
+    | NON_ZERO
+    | NUMBER
+
+heuristic: assign_unbumped? assign_new_score assign_score_inc?
+
+!assign_unbumped: condition? NEW_SCORE "=" unbumped_expr ";"
+!assign_new_score: NEW_SCORE "=" new_score_expr ";"
+!assign_score_inc: condition? SCORE_INC "=" score_inc_expr ";"
+
+?new_score_expr: ns_sum
+!?ns_sum: ns_prod
+    | ns_sum "+" ns_prod    -> ns_add
+    | ns_sum "-" ns_prod    -> ns_sub
+!?ns_prod: ns_exp
+    | ns_prod "*" ns_exp   -> ns_mul
+    | ns_prod "/" ns_exp   -> ns_div
+!?ns_exp: NUMBER
+    | ns_exp "^" NON_ZERO    -> ns_pow
+    | SCORE                 -> ns_score
+    | SCORE_INC             -> ns_inc
+    | CONFLICT_INDEX        -> ns_idx
+    | "(" ns_sum ")"
+
+?unbumped_expr: ub_prod
+!?ub_prod: ub_exp
+    | ub_prod "*" ub_exp   -> ub_mul
+    | ub_prod "/" ub_exp   -> ub_div
+!?ub_exp: NUMBER
+    | ub_exp "^" NON_ZERO    -> ub_pow
+    | SCORE                 -> ub_score
+    | CONFLICT_INDEX        -> ub_idx
+    | "(" ub_prod ")"
+
+?score_inc_expr: inc_sum
+!?inc_sum: inc_prod
+    | inc_sum "+" inc_prod    -> inc_add
+    | inc_sum "-" inc_prod    -> inc_sub
+!?inc_prod: inc_exp
+    | inc_prod "*" inc_exp   -> inc_mul
+    | inc_prod "/" inc_exp   -> inc_div
+!?inc_exp: NUMBER
+    | inc_exp "^" NON_ZERO    -> inc_pow
+    | SCORE_INC             -> inc_inc
+    | CONFLICT_INDEX        -> inc_idx
+    | "(" inc_sum ")"
+    
+bool_expr: bool_sum
+!?bool_sum: bool_prod
+    | bool_sum "+" bool_prod    -> bool_add
+    | bool_sum "-" bool_prod    -> bool_sub
+!?bool_prod: bool_exp
+    | bool_prod "*" bool_exp   -> bool_mul
+    | bool_prod "/" bool_exp   -> bool_div
+//    | bool_prod "%" bool_exp   -> bool_mod
+!?bool_exp: NUMBER
+    | bool_exp "^" NON_ZERO    -> bool_pow
+    | CONFLICT_INDEX        -> bool_idx
+    | "(" bool_sum ")"
+
+!condition: "if" "(" bool ")"
+?bool: bool_expr bool_opr bool_expr
+!bool_opr: "=="              -> equal
+//    | "!="                  -> neq
+//    | ">"                   -> greater
+//    | "<"                   -> less
+//    | ">="                  -> ge
+//    | "<="                  -> le
+
+
+NON_ZERO: "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+NUMBER: "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+NEW_SCORE: "new_score"
+SCORE_INC: "score_inc"
+CONFLICT_INDEX: "i"
+SCORE: "s"
+
+%import common.WS
+%ignore WS

@@ -86,14 +86,47 @@ namespace CaDiCaL {
         assert(opts.bump);
         int idx = vidx(lit);
         double old_score = score(idx);
+        double new_score = 0;
         assert(!evsids_limit_hit(old_score));
-        double new_score = old_score + score_inc;
-        if (evsids_limit_hit(new_score)) {
-            LOG ("bumping %g score of %d hits EVSIDS score limit", old_score, idx);
-            rescale_variable_scores();
-            old_score = score(idx);
-            assert(!evsids_limit_hit(old_score));
-            new_score = old_score + score_inc;
+
+        switch (opts.scheme) {
+            case 0:  // EVSIDS
+                new_score = old_score + score_inc;
+                if (evsids_limit_hit(new_score)) {
+                    LOG ("bumping %g score of %d hits EVSIDS score limit", old_score, idx);
+                    rescale_variable_scores();
+                    old_score = score(idx);
+                    assert(!evsids_limit_hit(old_score));
+                    new_score = old_score + score_inc;
+                }
+                break;
+            case 1:  // ACIDS
+                new_score = (old_score + stats.conflicts) / 2.0;
+                if (evsids_limit_hit(new_score)) {
+                    LOG ("bumping %g score of %d hits EVSIDS score limit", old_score, idx);
+                    rescale_variable_scores();
+                    old_score = score(idx);
+                    assert(!evsids_limit_hit(old_score));
+                    new_score = (old_score + stats.conflicts) / 2.0;
+                }
+                break;
+            case 2:  // VSIDS
+                if (stats.conflicts % 256 == 0) {
+                    for (auto var : vars)
+                        stab[var] *= 0.5;
+                }
+                old_score = score(idx);
+                new_score = old_score + 1;
+                break;
+            case 3:  // STATIC
+                new_score = old_score;
+                break;
+            case 4:  // INC
+                new_score = old_score + 1;
+                break;
+            case 5:  // SUM
+                new_score = old_score + stats.conflicts;
+                break;
         }
         assert(!evsids_limit_hit(new_score));
         LOG ("new %g score of %d", new_score, idx);
@@ -177,7 +210,7 @@ namespace CaDiCaL {
         for (const auto &lit : analyzed)
             bump_variable(lit);
 
-        if (use_scores()) bump_variable_score_inc();
+        if (use_scores() && opts.scheme == 0) bump_variable_score_inc();
 
         STOP (bump);
     }
