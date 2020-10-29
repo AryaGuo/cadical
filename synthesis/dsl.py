@@ -473,6 +473,7 @@ def run_gp():
     gp = GP(Config)
     gp.init_population()
     for i in range(Config.epoch):
+        print('----Epoch', i, '---')
         gp.report(5)
         gp.evolve()
 
