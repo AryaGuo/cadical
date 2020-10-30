@@ -1,7 +1,10 @@
+import argparse
+import logging
 import shutil
 import subprocess
 import random
 import sys
+import time
 from copy import deepcopy
 from pathlib import Path
 
@@ -25,7 +28,7 @@ class Scheme:
         self.dsl = dsl
         self.tree = tree
         self.code = self.dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness = self.eval_fitness()
+        self.solved, self.rtime, self.fitness, self.file = self.eval_fitness
 
     def dsl_to_cpp_(self, parse_tree, term_stabs: dict):
         if type(parse_tree) == Tree:
@@ -105,36 +108,41 @@ class Scheme:
 
     @staticmethod
     def compile_cadical():
-        # todo
         shutil.move('analyze.cpp', '../src/analyze.cpp')
         subprocess.run('cd .. ; make', shell=True, check=True)  # ./configure && make
 
+    @property
     def eval_fitness(self):
-        # return 40, 1.0, 100
+        # return 40, 1.0, 100, None
         self.embed_cadical(self.code)
         self.compile_cadical()
-
         subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
-        process = subprocess.run('cd .. ; BACKUPDIR=$(ls -td output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
-                                 'python python/gen_csv.py -S "cadical" -D ../Main-18/ -I $BACKUPDIR -O result/ -N $DIRNAME',
+        get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
+                                  capture_output=True)
+        basename = get_name.stdout.decode().strip()
+        process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
+                                 'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
+                                 '$DIRNAME'.format(output_dir),
                                  shell=True, check=True, capture_output=True)
         out = process.stdout.decode()
-        print(out)
+        logging.info(out)
         out = out.split()
         solved, rtime = int(out[0]), float(out[-1][:-1])
-        return solved, rtime, 30 * solved ** 2 + 60 / rtime  # todo
+        csvfile = output_dir / (basename + '.csv')
+        return solved, rtime, 30 * solved ** 2 + 60 / rtime, csvfile  # todo
 
     def update(self, new_tree):
         self.tree = new_tree
         self.code = self.dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness = self.eval_fitness()
+        self.solved, self.rtime, self.fitness, self.file = self.eval_fitness
 
 
 class DSL:
-    def __init__(self, meta_parser, grammar_file, wt, OP_prob):
+    def __init__(self, meta_parser, grammar_file, wt, OP_prob, gen_restart):
         self.grammar_file = grammar_file
         self.wt = wt
         self.OP_prob = OP_prob
+        self.gen_restart = gen_restart
         with open(grammar_file) as grammar:
             self.parser = Lark(grammar)
         with open(grammar_file) as grammar:
@@ -199,7 +207,7 @@ class DSL:
                     if type(token) == Token and token in self.wt:
                         cur += self.wt[token]
                 wt_lst.append(cur)
-            for i in range(100):
+            for i in range(self.gen_restart):
                 # n = random.randrange(len(expansions))
                 n = random.choices(range(len(expansions)), weights=wt_lst)[0]
                 substr = self.__gen_random_dsl(expansions[n], depth - 1)
@@ -403,7 +411,7 @@ class GP:
     def __init__(self, cfg):
         with open(cfg.meta_file) as meta_grammar:
             meta_parser = Lark(meta_grammar)
-        self.dsl = DSL(meta_parser, cfg.grammar_file, cfg.wt, cfg.OP_prob)
+        self.dsl = DSL(meta_parser, cfg.grammar_file, cfg.wt, cfg.OP_prob, cfg.gen_restart)
         self.population = []
         self.generation = 0
         self.pop_size = cfg.pop_size
@@ -440,8 +448,8 @@ class GP:
     def report(self, num):
         num = min(num, self.pop_size)
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
-        print('Generation', self.generation, ': Top', num, 'schemes\' score:',
-              [self.population[i].fitness for i in range(num)])
+        tops = [(self.population[i].solved, self.population[i].fitness) for i in range(num)]
+        logging.info('Top {} in generation {}: {}'.format(num, self.generation, tops))
 
     def get_winner(self):
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
@@ -471,19 +479,43 @@ class GP:
 
 def run_gp():
     gp = GP(Config)
+    logging.info('--- Initializing population ---')
     gp.init_population()
     for i in range(Config.epoch):
-        print('----Epoch', i, '---')
+        logging.info('--- Epoch {} starts ---'.format(i))
         gp.report(5)
         gp.evolve()
 
     winner = gp.get_winner()
-    print(winner.code)
-    print(winner.solved, winner.rtime, winner.fitness)
+    shutil.copy(winner.file, output_dir / 'winner.csv')
+    logging.info('Winner: {}'.format(winner.file))
+    logging.info('--- Winner\'s code ---\n{}\n--- End of code ---'.format(winner.code))
+    logging.info('{} solved, avg_time = {}, fitness = {}'.format(winner.solved, winner.rtime, winner.fitness))
+
+
+def main():
+    temp = vars(Config)
+    cfg_str = ' --- Config ---\n'
+    for item in temp:
+        cfg_str += '\t' + item + ' = ' + str(temp[item]) + '\n'
+    cfg_str += '--- End of config ---\n'
+    logging.info(cfg_str)
+    random.seed(Config.seed)
+    run_gp()
 
 
 if __name__ == '__main__':
-    random.seed(Config.seed)
-    # run_gp()
-    gp = GP(Config)
-    gp.test_gen_random()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-O", "--output_root", required=True, type=str)
+    args = parser.parse_args()
+
+    cur_time = time.strftime('%m%d-%H%M%S')
+    output_dir = Path(args.output_root) / cur_time
+    Path.mkdir(Path(args.output_root), exist_ok=True)
+    Path.mkdir(output_dir, exist_ok=True)
+
+    logging.basicConfig(format='%(levelname)s: %(message)s', filename=str(output_dir / 'log.txt'), level=logging.INFO)
+    stdoutLogger = logging.StreamHandler(sys.stdout)
+    stdoutLogger.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+    logging.getLogger().addHandler(stdoutLogger)
+    main()
