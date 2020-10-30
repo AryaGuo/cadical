@@ -109,7 +109,7 @@ class Scheme:
     @staticmethod
     def compile_cadical():
         shutil.move('analyze.cpp', '../src/analyze.cpp')
-        subprocess.run('cd .. ; make', shell=True, check=True)  # ./configure && make
+        subprocess.run('cd .. ; make', shell=True, check=True, capture_output=True)  # ./configure && make
 
     @property
     def eval_fitness(self):
@@ -455,6 +455,11 @@ class GP:
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
         return self.population[0]
 
+    def save(self, name):
+        self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
+        top = self.population[0]
+        shutil.copy(top.file, output_dir / (name + '.csv'))
+
     def __tournament_selection(self):
         rand_indices = random.sample(range(self.pop_size), self.tournament_size)
         temp_tournament = [self.population[rand_indices[i]] for i in range(self.tournament_size)]
@@ -485,6 +490,8 @@ def run_gp():
         logging.info('--- Epoch {} starts ---'.format(i))
         gp.report(5)
         gp.evolve()
+        if i % Config.save == 0:
+            gp.save('epoch_{}'.format(i))
 
     winner = gp.get_winner()
     shutil.copy(winner.file, output_dir / 'winner.csv')

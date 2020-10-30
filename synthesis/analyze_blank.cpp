@@ -174,7 +174,7 @@ namespace CaDiCaL {
         for (const auto &lit : analyzed)
             bump_variable(lit);
 
-        if (use_scores() && opts.scheme == 0) bump_variable_score_inc();
+//        if (use_scores() && opts.scheme == 0) bump_variable_score_inc();
 
         STOP (bump);
     }

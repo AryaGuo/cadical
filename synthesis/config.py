@@ -6,9 +6,10 @@ class Config:
     tournament_size = 4
     elitism = True
     seed = None
-    epoch = 2
+    epoch = 50
     mutation_rate = 0.1
     gen_restart = 10
+    save = 5
 
     wt = dict()
     wt['NON_ZERO'] = 5
