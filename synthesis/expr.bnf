@@ -71,7 +71,7 @@ bool_expr: bool_sum
     | bool_sum "+" bool_prod
 !bool_prod: bool_exp
     | bool_prod "*" bool_exp
-    | bool_prod "%"
+    | bool_prod "%" bool_exp
 !bool_exp: NUMBER
     | bool_exp "^" NON_ZERO -> bool_pow
     | CONFLICT_INDEX

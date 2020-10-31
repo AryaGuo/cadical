@@ -49,7 +49,7 @@ def cactus_plot(args):
                 break
             px.append(i)
             py.append(j)
-        plt.plot(px, py, label=None, alpha=0.8, markersize=5)
+        plt.plot(px, py, label=name if args.label else None, alpha=0.8, markersize=5)
 
     plt.xlim(0)
     plt.ylim(0, args.time_lim)
@@ -97,11 +97,12 @@ def gen_csv4all(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-I", "--input_dir", required=True, type=str)
+    parser.add_argument('-I', '--input_dir', required=True, type=str)
     parser.add_argument('-T', '--time_lim', default=5000, type=float)
-    parser.add_argument("-R", '--re', default='.*', type=str)
-    parser.add_argument("-B", '--baseline', default=True, type=bool)
-    parser.add_argument("-D", '--baseline_dir', default='../result_baseline', type=str)
+    parser.add_argument('-R', '--re', default='.*', type=str)
+    parser.add_argument('-B', '--baseline', default=True, type=bool)
+    parser.add_argument('-D', '--baseline_dir', default='../result_baseline', type=str)
+    parser.add_argument('-L', '--label', default=False, type=bool)
     args = parser.parse_args()
     cactus_plot(args)
     # gen_csv4all(args)

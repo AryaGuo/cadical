@@ -8,8 +8,8 @@ class Config:
     seed = None
     epoch = 50
     mutation_rate = 0.1
-    gen_restart = 10
-    save = 5
+    gen_restart = 50
+    save = 1
 
     wt = dict()
     wt['NON_ZERO'] = 5

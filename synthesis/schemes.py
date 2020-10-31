@@ -23,3 +23,21 @@ acids = """
 vmtf = """
         new_score = i;
     """
+
+w37 = """
+        new_score = s + 2 - 6 / i * i + score_inc; 
+"""
+
+w37eq = """
+        new_score = s - 4 + score_inc;
+"""
+
+w32 = """
+        new_score = 4 + i / 2 + score_inc / score_inc * s;
+        if (i != i)
+            score_inc = score_inc / 4 / score_inc;
+"""
+
+w32eq = """
+        new_score = 4 + i / 2 + s; 
+"""

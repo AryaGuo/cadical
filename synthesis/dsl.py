@@ -109,13 +109,18 @@ class Scheme:
     @staticmethod
     def compile_cadical():
         shutil.move('analyze.cpp', '../src/analyze.cpp')
-        subprocess.run('cd .. ; make', shell=True, check=True, capture_output=True)  # ./configure && make
+        try:
+            subprocess.run('cd .. ; make', shell=True, check=True, capture_output=True)  # ./configure && make
+        except subprocess.CalledProcessError:
+            return False
+        return True
 
     @property
     def eval_fitness(self):
         # return 40, 1.0, 100, None
         self.embed_cadical(self.code)
-        self.compile_cadical()
+        if not self.compile_cadical():
+            return 0, 0, 0, None  # Compilation error
         subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
         get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                   capture_output=True)
@@ -422,11 +427,28 @@ class GP:
         if self.tournament_size > self.pop_size:
             raise Exception('tournament_size larger than pop_size')
 
-    def init_population(self):  # todo: depth ~ distribution / depth range
+    def init_population(self, scheme_list=None):  # todo: depth ~ distribution / depth range
         assert self.generation == 0, self.generation
         self.generation = 1
-        for i in range(self.pop_size):
+        start = 0
+        if scheme_list is not None:
+            scheme_list = scheme_list[:self.pop_size]
+            start = len(scheme_list)
+            self.population = self.load_schemes(scheme_list)
+        for i in range(start, self.pop_size):
             self.population.append(self.dsl.gen_random_scheme('heuristic', self.depth_lim))
+
+    @staticmethod
+    def __load_schemes(scheme_list):
+        from synthesis import schemes
+        ret = []
+        for name in scheme_list:
+            try:
+                scheme = schemes.__getattribute__(name)
+                ret.append(scheme)
+            except AttributeError:
+                raise Exception('Unknown scheme "{}"'.format(name))
+        return ret
 
     def evolve(self):
         new_population = []
