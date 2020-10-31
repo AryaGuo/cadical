@@ -70,39 +70,46 @@ class Scheme:
 
         parse_tree = parse_tree.children[0]  # todo
 
-        code = ''
+        codes = ['', '', '']
         first = True
         term_subs = {'CONFLICT_INDEX': 'stats.conflicts', 'CIRCUMFLEX': ','}
         for c in parse_tree.children:
-            if not first:
-                code += '\n'
-            first = False
+            code = ''
+            # if not first:
+            #     code += '\n'
+            # first = False
             if c.data == 'assign_unbumped':
-                # code += 'for (auto var : vars) {\n\t'
                 term_subs['SCORE'] = 'stab[var]'
                 term_subs['NEW_SCORE'] = 'stab[var]'
                 code += self.dsl_to_cpp_(c, term_subs)
-                # code += '\n}'
+                codes[0] = code
             elif c.data == 'assign_new_score':
                 term_subs['SCORE'] = 'old_score'
                 term_subs['NEW_SCORE'] = 'new_score'
                 code += 'old_score = score(idx);\n'
                 code += self.dsl_to_cpp_(c, term_subs)
+                codes[1] = code
             elif c.data == 'assign_score_inc':
                 code += self.dsl_to_cpp_(c, term_subs)
-        return code
+                codes[2] = code
+        return codes
 
     @staticmethod
-    def embed_cadical(code_snippet):
-        code_snippet = code_snippet.splitlines()
-        for i in range(len(code_snippet)):
-            code_snippet[i] = '\t\t' + code_snippet[i]
-        code_snippet = '\n'.join(code_snippet)
+    def embed_cadical(codes):
+        # code_snippet = code_snippet.splitlines()
+        # for i in range(len(code_snippet)):
+        #     code_snippet[i] = '\t\t' + code_snippet[i]
+        # code_snippet = '\n'.join(code_snippet)
 
-        SPLIT = 92
+        SPLIT = [175, 92, 180]
         with open('analyze_blank.cpp', 'r') as cpp_file:
             code = cpp_file.readlines()
-        code.insert(SPLIT, code_snippet)
+        for j in range(2, -1, -1):
+            code_snippet = codes[j].splitlines()
+            for i in range(len(code_snippet)):
+                code_snippet[i] = '\t\t' + code_snippet[i]
+            code_snippet = '\n'.join(code_snippet)
+            code.insert(SPLIT[j], code_snippet)
         with open('analyze.cpp', 'w') as cpp_file:
             cpp_file.writelines(code)
 
