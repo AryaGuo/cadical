@@ -40,7 +40,7 @@ class Scheme:
             first = True
             if_body = False
             if 'pow' in parse_tree.data:
-                ret += 'pow('
+                ret += 'int(pow('
             for c in parse_tree.children:
                 if c == 'new_score' and parse_tree.data == 'assign_unbumped':
                     ret += 'for (auto var : vars) {\n\t'
@@ -55,7 +55,7 @@ class Scheme:
                     if_body = True
                     ret += ' {\n\t'
             if 'pow' in parse_tree.data:
-                ret += ')'
+                ret += '))'
             if parse_tree.data == 'assign_unbumped':
                 ret += '\n\t}' if if_body else '\n}'
             if if_body:
@@ -438,16 +438,16 @@ class GP:
         if self.tournament_size > self.pop_size:
             raise Exception('tournament_size larger than pop_size')
 
-    def init_population(self, scheme_list=None, eval=False):  # todo: depth ~ distribution / depth range
+    def init_population(self, scheme_list=None, eval_mode=False):  # todo: depth ~ distribution / depth range
         assert self.generation == 0, self.generation
         self.generation = 1
 
-        if eval:
+        if eval_mode:
             assert scheme_list is not None
             dsl_list = self.__load_schemes(scheme_list)
-            for dsl in dsl_list:
-                self.population.append(self.dsl.get_scheme_from_dsl(dsl))
-                return
+            for i in range(len(dsl_list)):
+                self.population.append(self.dsl.get_scheme_from_dsl(dsl_list[i], scheme_list[i]))
+            return
 
         start = 0
         if scheme_list is not None:
