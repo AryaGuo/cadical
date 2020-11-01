@@ -1,4 +1,6 @@
-static = """"""
+static = """
+        new_score = s;
+    """
 inc = """
         new_score = s + 1;
     """

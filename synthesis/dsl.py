@@ -446,6 +446,7 @@ class GP:
             assert scheme_list is not None
             dsl_list = self.__load_schemes(scheme_list)
             for i in range(len(dsl_list)):
+                logging.info('Evaluating {}'.format(scheme_list[i]))
                 self.population.append(self.dsl.get_scheme_from_dsl(dsl_list[i], scheme_list[i]))
             return
 
