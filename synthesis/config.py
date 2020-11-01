@@ -10,6 +10,7 @@ class Config:
     mutation_rate = 0.1
     gen_restart = 50
     save = 1
+    report = 5
 
     wt = dict()
     wt['NON_ZERO'] = 5

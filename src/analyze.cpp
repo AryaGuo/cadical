@@ -89,7 +89,7 @@ namespace CaDiCaL {
         double new_score = 0;
         assert(!evsids_limit_hit(old_score));
 
-        // insert here
+        // insert assign_new_score
 
 
         assert(!evsids_limit_hit(new_score));
@@ -171,10 +171,13 @@ namespace CaDiCaL {
                    analyze_bumped_rank(this), analyze_bumped_smaller(this));
         }
 
+        // insert assign_unbumped
+
         for (const auto &lit : analyzed)
             bump_variable(lit);
 
-//        if (use_scores() && opts.scheme == 0) bump_variable_score_inc();
+        // insert assign_score_inc
+
 
         STOP (bump);
     }

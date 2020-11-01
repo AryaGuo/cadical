@@ -22,13 +22,17 @@ class Scheme:
     Can be described by dsl(str), a parse tree(lark.Tree) or a c++ code snippet.
     """
 
-    def __init__(self, rule_dict, token_dict, dsl, tree):
+    def __init__(self, rule_dict, token_dict, dsl, tree, name=None):
         self.rule_dict = rule_dict
         self.token_dict = token_dict
         self.dsl = dsl
         self.tree = tree
         self.code = self.dsl_to_cpp(self.tree)
         self.solved, self.rtime, self.fitness, self.file = self.eval_fitness
+        if name is not None:
+            dst = self.file.parent / (name + '.csv')
+            shutil.move(self.file, dst)
+            self.file = dst
 
     def dsl_to_cpp_(self, parse_tree, term_stabs: dict):
         if type(parse_tree) == Tree:
@@ -65,8 +69,8 @@ class Scheme:
                 return parse_tree
 
     def dsl_to_cpp(self, parse_tree: Tree):
-        assert type(parse_tree) == Tree, type(parse_tree)
-        assert parse_tree.data == 'start', parse_tree.data
+        assert type(parse_tree) == Tree, parse_tree
+        assert parse_tree.data == 'start', parse_tree
 
         parse_tree = parse_tree.children[0]  # todo
 
@@ -167,11 +171,11 @@ class DSL:
         return self.get_scheme_from_dsl(self.__gen_random_dsl(self.rule_dict[rule], depth))
 
     def get_scheme_from_tree(self, tree):
-        scheme = Scheme(self.rule_dict, self.token_dict, None, tree)
+        scheme = Scheme(self.rule_dict, self.token_dict, None, tree, None)
         return scheme
 
-    def get_scheme_from_dsl(self, dsl):
-        scheme = Scheme(self.rule_dict, self.token_dict, dsl, self.parser.parse(dsl))
+    def get_scheme_from_dsl(self, dsl, name=None):
+        scheme = Scheme(self.rule_dict, self.token_dict, dsl, self.parser.parse(dsl), name)
         return scheme
 
     def __gen_random_dsl(self, parse_tree, depth: int):
@@ -197,7 +201,7 @@ class DSL:
                 return parse_tree
                 # raise Exception('Error: Unknown token type', parse_tree.type)
 
-        assert type(parse_tree) == Tree, type(parse_tree)
+        assert type(parse_tree) == Tree, parse_tree
 
         sample = ''
 
@@ -228,7 +232,7 @@ class DSL:
             return None
         elif parse_tree.data == 'expr':
             OP = parse_tree.children[-1]
-            assert OP.type == 'OP'
+            assert OP.type == 'OP', OP
             if '?' in OP:
                 coin = random.random()
                 if coin < self.OP_prob:
@@ -261,7 +265,7 @@ class DSL:
             else:
                 return parse_tree
 
-        assert type(parse_tree) == Tree
+        assert type(parse_tree) == Tree, parse_tree
 
         p_stop = depth / (depth + 5)  # todo: prob to mutate current node
         if random.random() < p_stop and parse_tree.data != 'start':
@@ -309,7 +313,7 @@ class DSL:
         """
         # print('crossover @ depth', depth, tree_a, '\n', tree_b)
         if type(tree_a) == Token:
-            assert type(tree_b) == Token
+            assert type(tree_b) == Token, tree_b
             # p_stop = depth / (depth + 3)  # todo depth ~ p
             # if random.random() < p_stop:
             #     return tree_b
@@ -317,9 +321,9 @@ class DSL:
             #     return tree_a
             return tree_b
 
-        assert type(tree_a) == Tree, type(tree_a)
-        assert type(tree_b) == Tree, type(tree_b)
-        assert tree_a.data == tree_b.data, (tree_a.data, tree_b.data)
+        assert type(tree_a) == Tree, tree_a
+        assert type(tree_b) == Tree, tree_b
+        assert tree_a.data == tree_b.data, (tree_a, tree_b)
 
         p_stop = depth / (depth + 3)  # todo depth ~ p
         if random.random() < p_stop and tree_a.data != 'start':
@@ -357,7 +361,7 @@ class DSL:
                 if expr.data == 'expr':
                     # print(i, ' expr', expr)
                     OP = expr.children[1]
-                    assert OP.type == 'OP'
+                    assert OP.type == 'OP', OP
                     name = expr.children[0]
                     is_token = name.children[0].type == 'TOKEN'
                     if '?' in OP:
@@ -368,8 +372,8 @@ class DSL:
                         j += ji
                         k += ki
                     else:
-                        assert self.__match(tree_a.children[j], name.children[0], is_token)
-                        assert self.__match(tree_b.children[k], name.children[0], is_token)
+                        assert self.__match(tree_a.children[j], name.children[0], is_token), (j, tree_a, name, is_token)
+                        assert self.__match(tree_b.children[k], name.children[0], is_token), (k, tree_b, name, is_token)
                         matched.append((j, k))
                         j, k = j + 1, k + 1
                 else:
@@ -378,8 +382,8 @@ class DSL:
                         continue
                     # print(i, 'name', expr)
                     is_token = expr.children[0].type == 'TOKEN'
-                    assert self.__match(tree_a.children[j], expr.children[0], is_token)
-                    assert self.__match(tree_b.children[k], expr.children[0], is_token)
+                    assert self.__match(tree_a.children[j], expr.children[0], is_token), (tree_a, expr, is_token)
+                    assert self.__match(tree_b.children[k], expr.children[0], is_token), (tree_b, expr, is_token)
                     matched.append((j, k))
                     j, k = j + 1, k + 1
                 if j >= len(tree_a.children) or k >= len(tree_b.children):
@@ -392,10 +396,10 @@ class DSL:
             else:
                 return tree_b
         else:
-            assert subrule.data == 'name'
+            assert subrule.data == 'name', subrule
             is_token = subrule.children[0].type == 'TOKEN'
-            assert self.__match(tree_a.children[0], subrule.children[0], is_token)
-            assert self.__match(tree_b.children[0], subrule.children[0], is_token)
+            assert self.__match(tree_a.children[0], subrule.children[0], is_token), (tree_a, subrule, is_token)
+            assert self.__match(tree_b.children[0], subrule.children[0], is_token), (tree_b, subrule, is_token)
             tree_a.children[0] = self.crossover(tree_a.children[0], tree_b.children[0], depth + 1)
             return tree_a
 
@@ -434,14 +438,24 @@ class GP:
         if self.tournament_size > self.pop_size:
             raise Exception('tournament_size larger than pop_size')
 
-    def init_population(self, scheme_list=None):  # todo: depth ~ distribution / depth range
+    def init_population(self, scheme_list=None, eval=False):  # todo: depth ~ distribution / depth range
         assert self.generation == 0, self.generation
         self.generation = 1
+
+        if eval:
+            assert scheme_list is not None
+            dsl_list = self.__load_schemes(scheme_list)
+            for dsl in dsl_list:
+                self.population.append(self.dsl.get_scheme_from_dsl(dsl))
+                return
+
         start = 0
         if scheme_list is not None:
             scheme_list = scheme_list[:self.pop_size]
             start = len(scheme_list)
-            self.population = self.load_schemes(scheme_list)
+            dsl_list = self.__load_schemes(scheme_list)
+            for i in range(len(dsl_list)):
+                self.population.append(self.dsl.get_scheme_from_dsl(dsl_list[i], scheme_list[i]))
         for i in range(start, self.pop_size):
             self.population.append(self.dsl.gen_random_scheme('heuristic', self.depth_lim))
 
@@ -517,7 +531,7 @@ def run_gp():
     gp.init_population()
     for i in range(Config.epoch):
         logging.info('--- Epoch {} starts ---'.format(i))
-        gp.report(5)
+        gp.report(Config.report)
         gp.evolve()
         if i % Config.save == 0:
             gp.save('epoch_{}'.format(i))
@@ -529,20 +543,41 @@ def run_gp():
     logging.info('{} solved, avg_time = {}, fitness = {}'.format(winner.solved, winner.rtime, winner.fitness))
 
 
+def get_seed():
+    if Config.seed is not None:
+        return Config.seed
+    else:
+        return random.randrange(sys.maxsize)
+
+
 def main():
+    if args.eval is not None:
+        schemes = args.eval
+        gp = GP(Config)
+        gp.init_population(schemes, True)
+        gp.report(len(schemes))
+        return
+
     temp = vars(Config)
     cfg_str = ' --- Config ---\n'
     for item in temp:
         cfg_str += '\t' + item + ' = ' + str(temp[item]) + '\n'
     cfg_str += '--- End of config ---\n'
     logging.info(cfg_str)
-    random.seed(Config.seed)
-    run_gp()
+    seed = get_seed()
+    random.seed(seed)
+    logging.info('Random seed: {}'.format(seed))
+    try:
+        run_gp()
+    except AssertionError as err:
+        logging.exception('Assertion failed :(')
+        raise err
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-O", "--output_root", required=True, type=str)
+    parser.add_argument('-O', '--output_root', required=True, type=str)
+    parser.add_argument('-E', '--eval', nargs='+', default=None, help='Evaluation mode; run eval for given schemes')
     args = parser.parse_args()
 
     cur_time = time.strftime('%m%d-%H%M%S')
