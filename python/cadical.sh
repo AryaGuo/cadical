@@ -1,5 +1,5 @@
 export PROJ_DIR=$(realpath $(dirname $(dirname $0)))
-export DATA_DIR=$(realpath ~/codelab/Main-18/)
+export DATA_DIR=$(realpath ~/Main-18/)
 
 python $PROJ_DIR/python/solvers.py \
 -S $PROJ_DIR/build/cadical \
