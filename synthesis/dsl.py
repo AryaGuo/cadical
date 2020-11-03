@@ -1,8 +1,8 @@
 import argparse
 import logging
+import random
 import shutil
 import subprocess
-import random
 import sys
 import time
 from copy import deepcopy
@@ -14,6 +14,11 @@ curPath = Path(__file__).resolve()
 sys.path.append(str(curPath.parents[1]))
 
 from synthesis.config import Config
+
+from monkeys import optimize
+from monkeys.typing import params, lookup_rtype
+from monkeys.search import require
+from monkey import grammar
 
 
 class Scheme:
@@ -39,10 +44,8 @@ class Scheme:
             ret = ''
             first = True
             if_body = False
-            if 'pow' in parse_tree.data:
-                ret += 'int(pow('
             for c in parse_tree.children:
-                if c == 'new_score' and parse_tree.data == 'assign_unbumped':
+                if c == 'unbumped' and parse_tree.data == 'assign_unbumped':
                     ret += 'for (auto var : vars) {\n\t'
                     first = True
                 if if_body and first:
@@ -54,8 +57,6 @@ class Scheme:
                 if type(c) == Tree and c.data == 'condition':
                     if_body = True
                     ret += ' {\n\t'
-            if 'pow' in parse_tree.data:
-                ret += '))'
             if parse_tree.data == 'assign_unbumped':
                 ret += '\n\t}' if if_body else '\n}'
             if if_body:
@@ -75,40 +76,31 @@ class Scheme:
         parse_tree = parse_tree.children[0]  # todo
 
         codes = ['', '', '']
-        first = True
-        term_subs = {'CONFLICT_INDEX': 'stats.conflicts', 'CIRCUMFLEX': ','}
+        term_subs = {'CONFLICT_INDEX': 'stats.conflicts', 'SCORE_INC': 'score_inc', 'UNBUMPED': 'stab[var]',
+                     'BUMPED': 'new_score'}
         for c in parse_tree.children:
             code = ''
-            # if not first:
-            #     code += '\n'
-            # first = False
             if c.data == 'assign_unbumped':
-                term_subs['SCORE'] = 'stab[var]'
-                term_subs['NEW_SCORE'] = 'stab[var]'
+                term_subs['LHS'] = 'stab[var]'
                 code += self.dsl_to_cpp_(c, term_subs)
                 codes[0] = code
             elif c.data == 'assign_new_score':
-                term_subs['SCORE'] = 'old_score'
-                term_subs['NEW_SCORE'] = 'new_score'
-                code += 'old_score = score(idx);\n'
+                term_subs['LHS'] = 'old_score'
+                code += 'double old_score = score(idx);\n'
                 code += self.dsl_to_cpp_(c, term_subs)
                 codes[1] = code
             elif c.data == 'assign_score_inc':
+                term_subs['LHS'] = 'score_inc'
                 code += self.dsl_to_cpp_(c, term_subs)
                 codes[2] = code
         return codes
 
     @staticmethod
     def embed_cadical(codes):
-        # code_snippet = code_snippet.splitlines()
-        # for i in range(len(code_snippet)):
-        #     code_snippet[i] = '\t\t' + code_snippet[i]
-        # code_snippet = '\n'.join(code_snippet)
-
-        SPLIT = [175, 92, 180]
+        SPLIT = [163, 91, 112]
         with open('analyze_blank.cpp', 'r') as cpp_file:
             code = cpp_file.readlines()
-        for j in range(2, -1, -1):
+        for j in range(3):
             code_snippet = codes[j].splitlines()
             for i in range(len(code_snippet)):
                 code_snippet[i] = '\t\t' + code_snippet[i]
@@ -575,6 +567,57 @@ def main():
         raise err
 
 
+def monkey():
+    def compile_cadical():
+        shutil.move('analyze.cpp', '../src/analyze.cpp')
+        try:
+            subprocess.run('cd .. ; make', shell=True, check=True, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)  # , capture_output=True)
+        except subprocess.CalledProcessError:
+            return False
+        return True
+
+    def embed_cadical(codes):
+        SPLIT = [163, 91, 112]
+        with open('analyze_blank.cpp', 'r') as cpp_file:
+            code = cpp_file.readlines()
+        for j in range(3):
+            code_snippet = codes.evaluate()[j].splitlines()
+            for i in range(len(code_snippet)):
+                code_snippet[i] = '\t\t' + code_snippet[i]
+            code_snippet = '\n'.join(code_snippet)
+            code.insert(SPLIT[j], code_snippet)
+        with open('analyze.cpp', 'w') as cpp_file:
+            cpp_file.writelines(code)
+
+    @require()
+    @params('heuristic')
+    def score(heuristic):
+        embed_cadical(heuristic)
+        if not compile_cadical():
+            return -sys.maxsize
+        subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
+        get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
+                                  capture_output=True)
+        basename = get_name.stdout.decode().strip()
+        process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
+                                 'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
+                                 '$DIRNAME'.format(output_dir),
+                                 shell=True, check=True, capture_output=True)
+        out = process.stdout.decode()
+        logging.info(out)
+        out = out.split()
+        solved, rtime = int(out[0]), float(out[-1][:-1])
+        return 30 * solved ** 2 + 60 / rtime
+
+    winner = optimize(score, iterations=5, population_size=10)
+    codes = winner.evaluate()
+    print('--- Winner\'s codes ---')
+    for code in codes:
+        print(code)
+    print('--- End of codes ---')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-O', '--output_root', required=True, type=str)
@@ -591,3 +634,4 @@ if __name__ == '__main__':
     stdoutLogger.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(stdoutLogger)
     main()
+    # monkey()

@@ -2,97 +2,67 @@ start: heuristic
     | assign_unbumped
     | assign_new_score
     | assign_score_inc
-    | new_score_expr
-    | ns_sum
-    | ns_prod
-    | ns_exp
-    | unbumped_expr
-    | ub_prod
-    | ub_exp
-    | score_inc_expr
-    | inc_sum
-    | inc_prod
-    | inc_exp
+    | expr
+    | sum
+    | prod
+    | atom
     | bool_expr
     | bool_sum
     | bool_prod
-    | bool_exp
+    | bool_atom
     | condition
     | bool
     | bool_opr
-    | NON_ZERO
     | NUMBER
+    | POWER
+    | DECIMAL
 
 heuristic: assign_unbumped? assign_new_score assign_score_inc?
 
-!assign_unbumped: condition? NEW_SCORE "=" unbumped_expr ";"
-!assign_new_score: NEW_SCORE "=" new_score_expr ";"
-!assign_score_inc: condition? SCORE_INC "=" score_inc_expr ";"
+!assign_unbumped: condition? UNBUMPED "=" expr ";"
+!assign_new_score: BUMPED "=" expr ";"
+!assign_score_inc: condition? SCORE_INC "=" expr ";"
 
-new_score_expr: ns_sum
-!ns_sum: ns_prod
-    | ns_sum "+" ns_prod
-    | ns_sum "-" ns_prod
-!ns_prod: ns_exp
-    | ns_prod "*" ns_exp
-    | ns_prod "/" ns_exp
-!ns_exp: NUMBER
-    | ns_exp "^" NON_ZERO -> ns_pow
-    | SCORE
+expr: sum
+!sum: prod
+    | sum "+" prod
+    | sum "-" prod
+!prod: atom
+    | prod "*" atom
+    | prod "/" atom
+!atom: NUMBER
+    | POWER
+    | DECIMAL
+    | CONFLICT_INDEX
     | SCORE_INC
-    | CONFLICT_INDEX
-    | "(" ns_sum ")"
+    | "(" sum ")"
+    | LHS
 
-unbumped_expr: ub_prod
-!ub_prod: ub_exp
-    | ub_prod "*" ub_exp
-    | ub_prod "/" ub_exp
-!ub_exp: NUMBER
-    | ub_exp "^" NON_ZERO -> ub_pow
-    | SCORE
-    | CONFLICT_INDEX
-    | "(" ub_prod ")"
-
-score_inc_expr: inc_sum
-!inc_sum: inc_prod
-    | inc_sum "+" inc_prod
-    | inc_sum "-" inc_prod
-!inc_prod: inc_exp
-    | inc_prod "*" inc_exp
-    | inc_prod "/" inc_exp
-!inc_exp: NUMBER
-    | inc_exp "^" NON_ZERO -> inc_pow
-    | SCORE_INC
-    | CONFLICT_INDEX
-    | "(" inc_sum ")"
-    
 bool_expr: bool_sum
 !bool_sum: bool_prod
     | bool_sum "+" bool_prod
-!bool_prod: bool_exp
-    | bool_prod "*" bool_exp
-    | bool_prod "%" bool_exp
-!bool_exp: NUMBER
-    | bool_exp "^" NON_ZERO -> bool_pow
+    | bool_sum "-" bool_prod
+!bool_prod: bool_atom
+    | bool_prod "*" bool_atom
+    | bool_prod "%" bool_atom
+!bool_atom: NUMBER
+    | POWER
     | CONFLICT_INDEX
     | "(" bool_sum ")"
 
 !condition: "if" "(" bool ")"
 bool: bool_expr bool_opr bool_expr
 !bool_opr: "=="
-    | "!="
-//    | ">"
-//    | "<"
-//    | ">="
-//    | "<="
+    | ">="
 
-
-NON_ZERO: "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 NUMBER: "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-NEW_SCORE: "new_score"
-SCORE_INC: "score_inc"
+POWER: "16" | "32" | "64" | "128" | "256" | "512" | "1024"
+DECIMAL: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7" | "0.8" | "0.9"
 CONFLICT_INDEX: "i"
-SCORE: "s"
+UNBUMPED: "unbumped"
+BUMPED: "bumped"
+SCORE_INC: "inc"
+LHS: "lhs"
 
 %import common.WS
 %ignore WS

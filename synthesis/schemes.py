@@ -1,45 +1,28 @@
 static = """
-        new_score = s;
+        bumped = lhs;
     """
 inc = """
-        new_score = s + 1;
+        bumped = lhs + 1;
     """
 sum = """
-        new_score = s + i;
+        bumped = lhs + i;
     """
 vsids = """
-        if (i % (2^8) == 0)
-            new_score = s / 2;
-        new_score = s + 1;
+        if (i % 256 == 0)
+            unbumped = lhs * 0.5;
+        bumped = lhs + 1;
     """
 nvsids = """
-        old_score = 0.8 * s;
-        new_score = s + (1 - 0.8);
+        unbumped = 0.8 * lhs;
+        bumped = lhs + (1 - 0.8);
     """
 evsids = """
-        new_score = s + (1/0.8)^i;
+        bumped = lhs + inc;
+        inc = lhs * (1 / 0.8);
     """
 acids = """
-        new_score = (s + i) / 2;
+        bumped = (lhs + i) / 2;
     """
 vmtf = """
-        new_score = i;
+        bumped = i;
     """
-
-w37 = """
-        new_score = s + 2 - 6 / i * i + score_inc; 
-"""
-
-w37eq = """
-        new_score = s - 4 + score_inc;
-"""
-
-w32 = """
-        new_score = 4 + i / 2 + score_inc / score_inc * s;
-        if (i != i)
-            score_inc = score_inc / 4 / score_inc;
-"""
-
-w32eq = """
-        new_score = 4 + i / 2 + s; 
-"""

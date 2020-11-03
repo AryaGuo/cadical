@@ -85,7 +85,6 @@ namespace CaDiCaL {
     void Internal::bump_variable_score(int lit) {
         assert(opts.bump);
         int idx = vidx(lit);
-        double old_score = score(idx);
         double new_score = 0;
         assert(!evsids_limit_hit(old_score));
 
@@ -110,18 +109,8 @@ namespace CaDiCaL {
 
     void Internal::bump_variable_score_inc() {
         assert(use_scores());
-        assert(!evsids_limit_hit(score_inc));
-        double f = 1e3 / opts.scorefactor;
-        double new_score_inc = score_inc * f;
-        if (evsids_limit_hit(new_score_inc)) {
-            LOG ("bumping %g increment by %g hits EVSIDS score limit", score_inc, f);
-            rescale_variable_scores();
-            new_score_inc = score_inc * f;
-        }
-        assert(!evsids_limit_hit(new_score_inc));
-        LOG ("bumped score increment from %g to %g with factor %g",
-             score_inc, new_score_inc, f);
-        score_inc = new_score_inc;
+        // insert assign_score_inc
+
     }
 
 /*------------------------------------------------------------------------*/
@@ -177,10 +166,7 @@ namespace CaDiCaL {
         for (const auto &lit : analyzed)
             bump_variable(lit);
 
-        // insert assign_score_inc
-
-
-//        if (use_scores() && opts.scheme == 0) bump_variable_score_inc();
+        if (use_scores()) bump_variable_score_inc();
 
         STOP (bump);
     }
