@@ -21,7 +21,7 @@ heuristic: assign_unbumped? assign_new_score assign_score_inc?
 
 !assign_unbumped: condition? UNBUMPED "=" expr ";"
 !assign_new_score: BUMPED "=" expr ";"
-!assign_score_inc: condition? SCORE_INC "=" expr ";"
+!assign_score_inc: condition? NEW_SCORE_INC "=" expr ";"
 
 expr: sum
 !sum: prod
@@ -63,6 +63,7 @@ UNBUMPED: "unbumped"
 BUMPED: "bumped"
 SCORE_INC: "inc"
 LHS: "lhs"
+NEW_SCORE_INC: "ninc"
 
 %import common.WS
 %ignore WS

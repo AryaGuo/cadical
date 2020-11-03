@@ -13,6 +13,8 @@ def cactus_plot(args):
 
     plt.figure()
     for fin in sorted(Path(args.baseline_dir).rglob('*.csv')):
+        if fin.stem == 'final':
+            continue
         px, py = [0], [0]
         rtime = []
         name = fin.stem
@@ -33,6 +35,8 @@ def cactus_plot(args):
     regex = re.compile(args.re)
     for fin in sorted(Path(args.input_dir).rglob('*.csv')):
         if not regex.match(fin.stem):
+            continue
+        if fin.stem == 'final':
             continue
         px, py = [0], [0]
         rtime = []
@@ -71,6 +75,8 @@ def gen_csv4all(args):
     for csvfile in sorted(Path(args.input_dir).rglob('*.csv')):
         if not regex.match(csvfile.stem):
             continue
+        if csv_final.stem == 'final':
+            continue
         fields.append(str(csvfile.stem))
         with open(csvfile) as cur:
             reader = csv.DictReader(cur)
@@ -100,12 +106,12 @@ def main():
     parser.add_argument('-I', '--input_dir', required=True, type=str)
     parser.add_argument('-T', '--time_lim', default=5000, type=float)
     parser.add_argument('-R', '--re', default='.*', type=str)
-    parser.add_argument('-B', '--baseline', default=True, action='store_true')
-    parser.add_argument('-D', '--baseline_dir', default='../result_baseline', type=str)
-    parser.add_argument('-L', '--label', default=False, action='store_true')
+    parser.add_argument('-B', '--baseline', action='store_true')
+    parser.add_argument('-D', '--baseline_dir', default='baseline', type=str)
+    parser.add_argument('-L', '--label', action='store_true')
     args = parser.parse_args()
     cactus_plot(args)
-    # gen_csv4all(args)
+    gen_csv4all(args)
 
 
 if __name__ == "__main__":

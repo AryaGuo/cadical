@@ -18,7 +18,7 @@ nvsids = """
     """
 evsids = """
         bumped = lhs + inc;
-        inc = lhs * (1 / 0.8);
+        ninc = lhs * (1 / 0.8);
     """
 acids = """
         bumped = (lhs + i) / 2;

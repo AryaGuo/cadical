@@ -77,7 +77,7 @@ class Scheme:
 
         codes = ['', '', '']
         term_subs = {'CONFLICT_INDEX': 'stats.conflicts', 'SCORE_INC': 'score_inc', 'UNBUMPED': 'stab[var]',
-                     'BUMPED': 'new_score'}
+                     'BUMPED': 'new_score', 'NEW_SCORE_INC': 'new_score_inc'}
         for c in parse_tree.children:
             code = ''
             if c.data == 'assign_unbumped':
@@ -86,7 +86,6 @@ class Scheme:
                 codes[0] = code
             elif c.data == 'assign_new_score':
                 term_subs['LHS'] = 'old_score'
-                code += 'double old_score = score(idx);\n'
                 code += self.dsl_to_cpp_(c, term_subs)
                 codes[1] = code
             elif c.data == 'assign_score_inc':
@@ -97,7 +96,7 @@ class Scheme:
 
     @staticmethod
     def embed_cadical(codes):
-        SPLIT = [163, 91, 112]
+        SPLIT = [[182], [92, 99], [124, 131]]
         with open('analyze_blank.cpp', 'r') as cpp_file:
             code = cpp_file.readlines()
         for j in range(3):
@@ -105,7 +104,8 @@ class Scheme:
             for i in range(len(code_snippet)):
                 code_snippet[i] = '\t\t' + code_snippet[i]
             code_snippet = '\n'.join(code_snippet)
-            code.insert(SPLIT[j], code_snippet)
+            for line in SPLIT[j]:
+                code.insert(line, code_snippet)
         with open('analyze.cpp', 'w') as cpp_file:
             cpp_file.writelines(code)
 

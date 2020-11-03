@@ -6,18 +6,16 @@ class Config:
     tournament_size = 4
     elitism = True
     seed = None
-    epoch = 50
-    mutation_rate = 0.1
+    epoch = 30
+    mutation_rate = 0.3
     gen_restart = 50
     save = 1
     report = 5
 
     wt = dict()
-    wt['NON_ZERO'] = 5
-    wt['NUMBER'] = 5
-    wt['NEW_SCORE'] = 1
-    wt['SCORE_INC'] = 2
-    wt['CONFLICT_INDEX'] = 3
-    wt['SCORE'] = 2
-    wt['+'] = wt['-'] = wt['*'] = wt['/'] = wt['^'] = 1
+    # wt['NUMBER'] = 5
+    # wt['DECIMAL'] = 5
+    # wt['POWER'] = 2
+    # wt['CONFLICT_INDEX'] = 3
+    # wt['+'] = wt['-'] = wt['*'] = wt['/'] = wt['^'] = 1
     OP_prob = 0.7
