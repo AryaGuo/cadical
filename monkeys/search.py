@@ -103,7 +103,7 @@ def tournament_select(trees, scoring_fn, selection_size, requires_population=Fal
         yield new_tree
 
 
-DEFAULT_TOURNAMENT_SELECT = functools.partial(tournament_select, selection_size=2)
+DEFAULT_TOURNAMENT_SELECT = functools.partial(tournament_select, selection_size=25)
         
         
 def pre_evaluate(scoring_fn):

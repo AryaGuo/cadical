@@ -1,4 +1,5 @@
 import argparse
+import functools
 import logging
 import random
 import shutil
@@ -15,10 +16,27 @@ sys.path.append(str(curPath.parents[1]))
 
 from synthesis.config import Config
 
-from monkeys import optimize
-from monkeys.typing import params, lookup_rtype
+from monkeys import optimize, tournament_select, next_generation
+from monkeys.typing import params
 from monkeys.search import require
 from monkey import grammar
+
+
+class Node:
+    def __init__(self, type, data=None, parent=None, children=None):
+        self.type = type  # name of TERM/RULE
+        self.data = data  # terminal string/None for rule
+        self.is_term = self.data is not None
+        self.parent = parent
+        self.depth = 1
+        self.size = 1
+        if children:
+            self.children = children
+        else:
+            self.children = []
+        for c in self.children:
+            self.depth = max(self.depth, c.depth + 1)
+            self.size += c.size
 
 
 class Scheme:
@@ -34,10 +52,16 @@ class Scheme:
         self.tree = tree
         self.code = self.dsl_to_cpp(self.tree)
         self.solved, self.rtime, self.fitness, self.file = self.eval_fitness
-        if name is not None:
+        if name is not None and self.file is not None:
             dst = self.file.parent / (name + '.csv')
             shutil.move(self.file, dst)
             self.file = dst
+
+    def display(self):
+        logging.info('-----')
+        for code in self.code:
+            logging.info(code)
+        logging.info('-----')
 
     def dsl_to_cpp_(self, parse_tree, term_stabs: dict):
         if type(parse_tree) == Tree:
@@ -121,23 +145,28 @@ class Scheme:
     @property
     def eval_fitness(self):
         # return 40, 1.0, 100, None
-        self.embed_cadical(self.code)
-        if not self.compile_cadical():
-            return 0, 0, 0, None  # Compilation error
-        subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
-        get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
-                                  capture_output=True)
-        basename = get_name.stdout.decode().strip()
-        process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
-                                 'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
-                                 '$DIRNAME'.format(output_dir),
-                                 shell=True, check=True, capture_output=True)
-        out = process.stdout.decode()
-        logging.info(out)
-        out = out.split()
-        solved, rtime = int(out[0]), float(out[-1][:-1])
-        csvfile = output_dir / (basename + '.csv')
-        return solved, rtime, 30 * solved ** 2 + 60 / rtime, csvfile  # todo
+        try:
+            self.embed_cadical(self.code)
+            if not self.compile_cadical():
+                return 0, 0, 0, None  # Compilation error
+            subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
+            get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
+                                      capture_output=True)
+            basename = get_name.stdout.decode().strip()
+            process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
+                                     'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
+                                     '$DIRNAME'.format(output_dir),
+                                     shell=True, check=True, capture_output=True)
+            out = process.stdout.decode()
+            logging.info(out)
+            out = out.split()
+            solved, rtime = int(out[0]), float(out[-1][:-1])
+            csvfile = output_dir / (basename + '.csv')
+            self.display()
+            return solved, rtime, 30 * solved ** 2 + 60 / rtime, csvfile  # todo
+        except subprocess.CalledProcessError as err:
+            logging.error(err)
+            return 0, 0, -sys.maxsize, None
 
     def update(self, new_tree):
         self.tree = new_tree
@@ -515,13 +544,13 @@ class GP:
 
     def test_gen_random(self):
         s = self.dsl.gen_random_scheme('heuristic', self.depth_lim)
-        print(s.code)
+        s.display()
 
 
 def run_gp():
     gp = GP(Config)
     logging.info('--- Initializing population ---')
-    gp.init_population()
+    gp.init_population(scheme_list=args.load)
     for i in range(Config.epoch):
         logging.info('--- Epoch {} starts ---'.format(i))
         gp.report(Config.report)
@@ -532,7 +561,7 @@ def run_gp():
     winner = gp.get_winner()
     shutil.copy(winner.file, output_dir / 'winner.csv')
     logging.info('Winner: {}'.format(winner.file))
-    logging.info('--- Winner\'s code ---\n{}\n--- End of code ---'.format(winner.code))
+    winner.display()
     logging.info('{} solved, avg_time = {}, fitness = {}'.format(winner.solved, winner.rtime, winner.fitness))
 
 
@@ -571,14 +600,13 @@ def monkey():
     def compile_cadical():
         shutil.move('analyze.cpp', '../src/analyze.cpp')
         try:
-            subprocess.run('cd .. ; make', shell=True, check=True, stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE)  # , capture_output=True)
+            subprocess.run('cd .. ; make', shell=True, check=True, capture_output=True)  # ./configure && make
         except subprocess.CalledProcessError:
             return False
         return True
 
     def embed_cadical(codes):
-        SPLIT = [163, 91, 112]
+        SPLIT = [[182], [92, 99], [124, 131]]
         with open('analyze_blank.cpp', 'r') as cpp_file:
             code = cpp_file.readlines()
         for j in range(3):
@@ -586,31 +614,36 @@ def monkey():
             for i in range(len(code_snippet)):
                 code_snippet[i] = '\t\t' + code_snippet[i]
             code_snippet = '\n'.join(code_snippet)
-            code.insert(SPLIT[j], code_snippet)
+            for line in SPLIT[j]:
+                code.insert(line, code_snippet)
         with open('analyze.cpp', 'w') as cpp_file:
             cpp_file.writelines(code)
 
     @require()
     @params('heuristic')
     def score(heuristic):
-        embed_cadical(heuristic)
-        if not compile_cadical():
+        try:
+            embed_cadical(heuristic)
+            if not compile_cadical():
+                return -sys.maxsize
+            subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
+            process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
+                                     'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
+                                     '$DIRNAME'.format(output_dir),
+                                     shell=True, check=True, capture_output=True)
+            out = process.stdout.decode()
+            logging.info(out)
+            out = out.split()
+            solved, rtime = int(out[0]), float(out[-1][:-1])
+            return 30 * solved ** 2 + 60 / rtime
+        except subprocess.CalledProcessError as err:
+            logging.error(err)
             return -sys.maxsize
-        subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
-        get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
-                                  capture_output=True)
-        basename = get_name.stdout.decode().strip()
-        process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
-                                 'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
-                                 '$DIRNAME'.format(output_dir),
-                                 shell=True, check=True, capture_output=True)
-        out = process.stdout.decode()
-        logging.info(out)
-        out = out.split()
-        solved, rtime = int(out[0]), float(out[-1][:-1])
-        return 30 * solved ** 2 + 60 / rtime
 
-    winner = optimize(score, iterations=5, population_size=10)
+    select_fn = functools.partial(tournament_select, selection_size=Config.tournament_size)
+    winner = optimize(score, iterations=Config.epoch, population_size=Config.pop_size,
+                      next_generation=functools.partial(next_generation, select_fn=select_fn,
+                                                        mutation_rate=Config.mutation_rate))
     codes = winner.evaluate()
     print('--- Winner\'s codes ---')
     for code in codes:
@@ -621,7 +654,9 @@ def monkey():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-O', '--output_root', required=True, type=str)
-    parser.add_argument('-E', '--eval', nargs='+', default=None, help='Evaluation mode; run eval for given schemes')
+    parser.add_argument('-E', '--eval', nargs='+', default=None, help='Evaluation mode: run eval for given schemes.')
+    parser.add_argument('-L', '--load', nargs='+', default=None, help='Initialize from given schemes.')
+    parser.add_argument('-M', '--monkey', action='store_true')
     args = parser.parse_args()
 
     cur_time = time.strftime('%m%d-%H%M%S')
@@ -633,5 +668,7 @@ if __name__ == '__main__':
     stdoutLogger = logging.StreamHandler(sys.stdout)
     stdoutLogger.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(stdoutLogger)
-    main()
-    # monkey()
+    if args.monkey:
+        monkey()
+    else:
+        main()

@@ -26,3 +26,10 @@ acids = """
 vmtf = """
         bumped = i;
     """
+gen1 = """
+        if (i == 512)
+            unbumped = inc * 0.9 + 1 / 128;
+        bumped = 2 * 0.4 + i;
+        if (i >= i)
+            ninc = lhs;
+"""

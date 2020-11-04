@@ -73,12 +73,6 @@ def modulo(a, b):
     return '({} % {})'.format(a, b)
 
 
-@params('nonzero')
-@rtype(int)
-def to_int(a):
-    return a
-
-
 @params(int)
 @rtype(float)
 def int_to_float(a):
@@ -194,4 +188,4 @@ constant(float, 'lhs')
 constant(float, 'score_inc')
 
 free(int, 'nonzero')
-free(float, int)
+# free(float, int)

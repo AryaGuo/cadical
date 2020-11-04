@@ -4,7 +4,7 @@ import copy
 
 from past.builtins import xrange
 
-from monkeys.typing import lookup_rtype, rtype, params, prettify_converted_type
+from monkeys.typing import lookup_rtype, rtype, params, prettify_converted_type, lookup_convert
 from monkeys.exceptions import UnsatisfiableType, TreeConstructionError
 
 _REGISTERED_INPUTS = {}
@@ -31,15 +31,17 @@ class Node(object):
             self.num_children = len(init_list)
             self.children = []
             for i, (fn, sublist) in enumerate(init_list):
-                print(allowed_children[i])
-                print(fn)
-                # todo: _convert
                 if fn not in allowed_children[i]:
-                    raise UnsatisfiableType(
-                        "Invalid initialization for {}. "
-                        "{} expected, {} ({}) provided.".format(self.f.__name__, self.rtype, fn.__name__, fn.rtype)
-                    )
-                self.children.append(Node(fn, init_list=sublist))
+                    convert_fn = lookup_convert(f.__getattribute__('__params')[i], fn.rtype)
+                    if convert_fn is not None:
+                        self.children.append(Node(convert_fn, init_list=[(fn, sublist)]))
+                    else:
+                        raise UnsatisfiableType(
+                            "Invalid initialization for {}. {} expected, {} ({}) provided.".format(
+                                self.f.__name__, self.rtype, fn.__name__, fn.rtype)
+                        )
+                else:
+                    self.children.append(Node(fn, init_list=sublist))
             return
 
         if selection_strategy is not None:

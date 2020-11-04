@@ -4,12 +4,12 @@ import collections
 from past.builtins import basestring
 from six import iterkeys, itervalues
 
-
 REGISTERED_TYPES = set()
 _STRING_TYPE_MAPPINGS = {}
 
-
 _func = collections.namedtuple('Function', 'params rtype')
+
+
 def func(*args):
     """Function container for higher-order parameters and return types."""
     assert len(args) >= 2
@@ -27,14 +27,14 @@ def convert_type(t):
         converted = None
     elif isinstance(t, collections.Mapping):
         converted = (
-            collections.Mapping, 
+            collections.Mapping,
             convert_type(next(iterkeys(t))),
             convert_type(next(itervalues(t))),
         )
     elif isinstance(t, _func):
         converted = (
-            _func, 
-            tuple(map(convert_type, t.params)), 
+            _func,
+            tuple(map(convert_type, t.params)),
             convert_type(t.rtype)
         )
     elif isinstance(t, basestring):
@@ -83,10 +83,12 @@ def __type_annotations_factory():
         Register lifted version of function for use with higher-order 
         functions.
         """
+
         @params(convert=False, first_class=False)
         @rtype((_func, f.__params, f.rtype), convert=False, first_class=False)
         def const_f():
             return f
+
         const_f.__name__ = '_FC_{}'.format(f.__name__)
 
     def check_for_registration(f):
@@ -110,6 +112,7 @@ def __type_annotations_factory():
         """Specify the return type of a function."""
         _convert_type = convert_type if convert else __id
         check = check_for_registration if first_class else __id
+
         def decorator(f):
             _return_type = _convert_type(return_type)
             RTYPES[_return_type].append(f)
@@ -117,12 +120,14 @@ def __type_annotations_factory():
             f.rtype = _return_type
             check(f)
             return f
+
         return decorator
 
     def params(*param_types, **kwargs):
         """Specify the required types for a function."""
         _convert_type = convert_type if kwargs.get('convert', True) else __id
         check = check_for_registration if kwargs.get('first_class', True) else __id
+
         def decorator(f):
             _param_types = tuple(map(_convert_type, param_types))
             f.allowed_children = allowed_children_factory(_param_types)
@@ -131,23 +136,28 @@ def __type_annotations_factory():
             f.__params = _param_types
             check(f)
             return f
+
         return decorator
 
     def constant(return_type, value):
         """Register a constant value under the given type."""
+
         @params()
         @rtype(return_type)
         def _const():
             return value
+
         _const.__name__ += '_' + str(value)
         return value
-    
+
     def free(target_type, source_type):
         """Allow free one-way conversion from source type to target type."""
+
         @params(source_type)
         @rtype(target_type)
         def _convert(x):
             return x
+
         _convert.__name__ += '_{src}_to_{tgt}'.format(
             src=prettify_converted_type(convert_type(source_type)),
             tgt=prettify_converted_type(convert_type(target_type)),
@@ -157,7 +167,7 @@ def __type_annotations_factory():
     def lookup_rtype(return_type, convert=True):
         """Find functions and constants of the given return type."""
         return RTYPES[(convert_type if convert else __id)(return_type)]
-    
+
     def deregister(fn):
         """Remove function from usage."""
         for fn_list in RTYPES.values():
@@ -166,17 +176,18 @@ def __type_annotations_factory():
             except ValueError:
                 continue
 
-    def lookup_name(return_type, name, convert=True):
-        funcs = RTYPES[(convert_type if convert else __id)(return_type)]
+    def lookup_convert(tgt_type, src_type, convert=True):
+        funcs = RTYPES[(convert_type if convert else __id)(tgt_type)]
+        key = (convert_type if convert else __id)(src_type)
         for func in funcs:
-            if name == func.__name__:
+            if len(func.__params) == 1 and func.__params[0] == key and '_convert' in func.__name__:
                 return func
         return None
 
-    return rtype, params, constant, free, lookup_rtype, deregister, lookup_name
+    return rtype, params, constant, free, lookup_rtype, deregister, lookup_convert
 
 
-rtype, params, constant, free, lookup_rtype, deregister, lookup_name = __type_annotations_factory()
+rtype, params, constant, free, lookup_rtype, deregister, lookup_convert = __type_annotations_factory()
 
 
 def ignore(failure_value, *exceptions):
@@ -187,5 +198,7 @@ def ignore(failure_value, *exceptions):
                 return f(*args, **kwargs)
             except exceptions:
                 return failure_value
+
         return wrapper
+
     return decorator
