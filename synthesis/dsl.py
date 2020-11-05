@@ -368,7 +368,7 @@ class DSL:
             return self.__gen_random_tree(self.rule_dict[parse_tree.data.lstrip('?!')], 10)
 
         rand_child_index = random.randrange(len(parse_tree.children))
-        parse_tree.children[rand_child_index] = self.mutate(parse_tree.children[rand_child_index], 1, depth + 1)
+        parse_tree.children[rand_child_index] = self.mutate(parse_tree.children[rand_child_index], depth + 1)
         return parse_tree
 
     @staticmethod
