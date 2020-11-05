@@ -4,6 +4,8 @@ import collections
 from past.builtins import basestring
 from six import iterkeys, itervalues
 
+from monkeys.config import MAX_DEPTH_LIMIT
+
 REGISTERED_TYPES = set()
 _STRING_TYPE_MAPPINGS = {}
 
@@ -202,3 +204,29 @@ def ignore(failure_value, *exceptions):
         return wrapper
 
     return decorator
+
+
+def type_possibility_tables():
+    grow_type_table = [collections.defaultdict(set) for _ in range(MAX_DEPTH_LIMIT)]
+    full_type_table = [collections.defaultdict(set) for _ in range(MAX_DEPTH_LIMIT)]
+
+    for t in REGISTERED_TYPES:
+        t_funcs = lookup_rtype(t)
+        for func in t_funcs:
+            if len(func.__params) == 0:  # terminals
+                grow_type_table[0][t].add(func)
+                full_type_table[0][t].add(func)
+    for i in range(1, MAX_DEPTH_LIMIT):
+        for k in grow_type_table[i - 1].keys():
+            grow_type_table[i][k].update(grow_type_table[i - 1][k])
+        for t in REGISTERED_TYPES:
+            t_funcs = lookup_rtype(t)
+            for func in t_funcs:
+                if len(func.__params) > 0:  # non-terminals
+                    grow_check = [func.__params[j] in grow_type_table[i - 1] for j in range(len(func.__params))]
+                    full_check = [func.__params[j] in full_type_table[i - 1] for j in range(len(func.__params))]
+                    if all(grow_check):
+                        grow_type_table[i][t].add(func)
+                    if all(full_check):
+                        full_type_table[i][t].add(func)
+    return grow_type_table, full_type_table

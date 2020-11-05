@@ -6,6 +6,6 @@ python $PROJ_DIR/python/solvers.py \
 -I $DATA_DIR \
 -O $PROJ_DIR/output \
 -N 16 \
--T 60 \
+-T $1 \
 -P $PROJ_DIR/python/problems.txt \
 -X='--sat'

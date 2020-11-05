@@ -11,6 +11,7 @@ class Config:
     gen_restart = 50
     save = 1
     report = 5
+    time_lim = 60
 
     wt = dict()
     wt['LHS'] = 1

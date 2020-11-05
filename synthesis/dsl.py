@@ -149,7 +149,7 @@ class Scheme:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
-            subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
+            subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True, capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()
@@ -262,6 +262,85 @@ class DSL:
                     return ''
         else:
             return self.__gen_random_dsl(parse_tree.children[0], depth)
+
+    def __gen_random_node(self, rule, depth: int):
+        """
+        Generate a random instance from the specified grammar rule.
+        :param rule: Grammar rule in lark.Tree or lark.Token format.
+        :param depth: Recursive depth limits for subtrees.
+        :return: A random string satisfying the grammar rule.
+        """
+        # print('[gen_random @ {}]'.format(depth), parse_tree)
+
+        if depth < 0:
+            return None
+
+        if type(rule) == Token:
+            if rule.type == 'TOKEN':
+                return self.__gen_random_dsl(self.token_dict[rule], depth)
+            elif rule.type == 'STRING':
+                return rule.strip('"')
+            elif rule.type == 'RULE':
+                return self.__gen_random_dsl(self.rule_dict[rule], depth)
+            else:
+                return rule
+                # raise Exception('Error: Unknown token type', parse_tree.type)
+
+        assert type(rule) == Tree, rule
+
+        sample = ''
+
+        if rule.data == 'token':
+            name = rule.children[0]
+            expansions = rule.children[-1]
+            child = self.__gen_random_node(expansions, depth)
+            node = Node(name, children=[child])
+            child.parent = node
+            return node
+        if rule.data == 'rule':
+            name = rule.children[0]
+            expansions = rule.children[-1]
+            child = self.__gen_random_node(expansions, depth)
+            node = Node(name, children=child)
+            child.parent = node
+            return node
+
+        if rule.data == 'rule' or rule.data == 'token':
+            return self.__gen_random_dsl(rule.children[-1], depth)
+        elif rule.data == 'expansion':
+            for c in rule.children:
+                substr = self.__gen_random_dsl(c, depth - 1)
+                if substr is None:
+                    return None
+                sample += substr
+            return sample
+        elif rule.data == 'expansions':
+            expansions = rule.children
+            wt_lst = []
+            for c in expansions:
+                cur = 1
+                for token in c.children:
+                    if type(token) == Token and token in self.wt:
+                        cur += self.wt[token]
+                wt_lst.append(cur)
+            for i in range(self.gen_restart):
+                # n = random.randrange(len(expansions))
+                n = random.choices(range(len(expansions)), weights=wt_lst)[0]
+                substr = self.__gen_random_dsl(expansions[n], depth - 1)
+                if substr is not None:
+                    return substr
+            return None
+        elif rule.data == 'expr':
+            OP = rule.children[-1]
+            assert OP.type == 'OP', OP
+            if '?' in OP:
+                coin = random.random()
+                if coin < self.OP_prob:
+                    return self.__gen_random_dsl(rule.children[0], depth - 1)
+                else:
+                    return ''
+        else:
+            return self.__gen_random_dsl(rule.children[0], depth)
 
     def __gen_random_tree(self, rule, depth, is_token=False):
         dsl_str = self.__gen_random_dsl(rule, depth)

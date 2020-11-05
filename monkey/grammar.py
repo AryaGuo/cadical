@@ -85,11 +85,6 @@ def nonzero_to_float(a):
     return 'double({})'.format(a)
 
 
-# free(int, 'nonzero')
-# free(float, int)
-# free(float, 'nonzero')
-
-
 @params(int, int)
 @rtype(bool)
 def equal_int(a, b):
@@ -157,15 +152,23 @@ def assign_unbumped(rhs):
 
 @params(float)
 @rtype('assign_new_score')
-def assign_unbumped(rhs):
+def assign_new_score(rhs):
     return """double lhs = score(idx);
 new_score = {};
 """.format(rhs)
 
 
+# @params()
+# @rtype('assign_new_score')
+# def assign_new_score(rhs):
+#     return """double lhs = score(idx);
+# new_score = score_inc;
+# """.format(rhs)
+
+
 @params(float)
 @rtype('assign_score_inc')
-def assign_unbumped(rhs):
+def assign_score_inc(rhs):
     return """double lhs = score_inc;
 score_inc = {};""".format(rhs)
 
@@ -188,4 +191,3 @@ constant(float, 'lhs')
 constant(float, 'score_inc')
 
 free(int, 'nonzero')
-# free(float, int)
