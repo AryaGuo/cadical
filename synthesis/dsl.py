@@ -697,7 +697,8 @@ def monkey():
             embed_cadical(heuristic)
             if not compile_cadical():
                 return -sys.maxsize
-            subprocess.run('cd .. ; sh python/cadical.sh', shell=True, check=True, capture_output=True)
+            subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
+                           capture_output=True)
             process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
                                      'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
                                      '$DIRNAME'.format(output_dir),
