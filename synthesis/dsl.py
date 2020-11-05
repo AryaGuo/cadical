@@ -176,11 +176,8 @@ class Scheme:
 
 
 class DSL:
-    def __init__(self, meta_parser, grammar_file, wt, OP_prob, gen_restart):
+    def __init__(self, meta_parser, grammar_file):
         self.grammar_file = grammar_file
-        self.wt = wt
-        self.OP_prob = OP_prob
-        self.gen_restart = gen_restart
         with open(grammar_file) as grammar:
             self.parser = Lark(grammar)
         with open(grammar_file) as grammar:
@@ -242,10 +239,10 @@ class DSL:
             for c in expansions:
                 cur = 1
                 for token in c.children:
-                    if type(token) == Token and token in self.wt:
-                        cur += self.wt[token]
+                    if type(token) == Token and token in Config.wt:
+                        cur += Config.wt[token]
                 wt_lst.append(cur)
-            for i in range(self.gen_restart):
+            for i in range(Config.gen_restart):
                 # n = random.randrange(len(expansions))
                 n = random.choices(range(len(expansions)), weights=wt_lst)[0]
                 substr = self.__gen_random_dsl(expansions[n], depth - 1)
@@ -257,7 +254,7 @@ class DSL:
             assert OP.type == 'OP', OP
             if '?' in OP:
                 coin = random.random()
-                if coin < self.OP_prob:
+                if coin < Config.OP_prob:
                     return self.__gen_random_dsl(parse_tree.children[0], depth - 1)
                 else:
                     return ''
@@ -321,10 +318,10 @@ class DSL:
             for c in expansions:
                 cur = 1
                 for token in c.children:
-                    if type(token) == Token and token in self.wt:
-                        cur += self.wt[token]
+                    if type(token) == Token and token in Config.wt:
+                        cur += Config.wt[token]
                 wt_lst.append(cur)
-            for i in range(self.gen_restart):
+            for i in range(Config.gen_restart):
                 # n = random.randrange(len(expansions))
                 n = random.choices(range(len(expansions)), weights=wt_lst)[0]
                 substr = self.__gen_random_dsl(expansions[n], depth - 1)
@@ -336,7 +333,7 @@ class DSL:
             assert OP.type == 'OP', OP
             if '?' in OP:
                 coin = random.random()
-                if coin < self.OP_prob:
+                if coin < Config.OP_prob:
                     return self.__gen_random_dsl(rule.children[0], depth - 1)
                 else:
                     return ''
@@ -357,9 +354,7 @@ class DSL:
                 # print('GEN', name, ret)
             return ret
 
-    def mutate(self, parse_tree, rate, depth):
-        if random.random() > rate:
-            return parse_tree
+    def mutate(self, parse_tree, depth):
         if type(parse_tree) == Token:
             if parse_tree.type in self.token_dict and self.token_dict[parse_tree.type].data != 'literal':
                 return self.__gen_random_tree(self.token_dict[parse_tree.type], 10, True)
@@ -528,14 +523,13 @@ class GP:
     def __init__(self, cfg):
         with open(cfg.meta_file) as meta_grammar:
             meta_parser = Lark(meta_grammar)
-        self.dsl = DSL(meta_parser, cfg.grammar_file, cfg.wt, cfg.OP_prob, cfg.gen_restart)
+        self.dsl = DSL(meta_parser, cfg.grammar_file)
         self.population = []
         self.generation = 0
         self.pop_size = cfg.pop_size
         self.elitism = cfg.elitism
         self.depth_lim = cfg.depth_lim
         self.tournament_size = cfg.tournament_size
-        self.mutation_rate = cfg.mutation_rate
         if self.tournament_size > self.pop_size:
             raise Exception('tournament_size larger than pop_size')
 
@@ -612,10 +606,13 @@ class GP:
         return deepcopy(temp_tournament[0]), deepcopy(temp_tournament[1])
 
     def __mutate(self, scheme):
-        scheme.update(self.dsl.mutate(scheme.tree, self.mutation_rate, 0))
+        if random.random() < Config.mutation_rate:
+            scheme.update(self.dsl.mutate(scheme.tree, 0))
 
     def __crossover(self, scheme_0, scheme_1):
-        return self.dsl.crossover(scheme_0.tree, scheme_1.tree, 1)
+        if random.random() < Config.crossover_rate:
+            return self.dsl.crossover(scheme_0.tree, scheme_1.tree, 1)
+        return scheme_0.tree
 
     def test_cross(self):
         ta = self.dsl.gen_random_scheme('heuristic', 15)
@@ -715,6 +712,7 @@ def monkey():
     select_fn = functools.partial(tournament_select, selection_size=Config.tournament_size)
     winner = optimize(score, iterations=Config.epoch, population_size=Config.pop_size,
                       next_generation=functools.partial(next_generation, select_fn=select_fn,
+                                                        crossover_rate=Config.crossover_rate,
                                                         mutation_rate=Config.mutation_rate))
     codes = winner.evaluate()
     print('--- Winner\'s codes ---')

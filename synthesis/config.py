@@ -3,11 +3,12 @@ class Config:
     grammar_file = 'expr.bnf'
     pop_size = 20
     depth_lim = 10
-    tournament_size = 4
+    tournament_size = 2
     elitism = True
     seed = None
     epoch = 20
     mutation_rate = 0.2
+    crossover_rate = 0.9
     gen_restart = 50
     save = 1
     report = 5

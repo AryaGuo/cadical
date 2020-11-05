@@ -41,7 +41,6 @@ expr: sum
 bool_expr: bool_sum
 !bool_sum: bool_prod
     | bool_sum "+" bool_prod
-    | bool_sum "-" bool_prod
 !bool_prod: bool_atom
     | bool_prod "*" bool_atom
     | bool_prod "%" bool_atom
