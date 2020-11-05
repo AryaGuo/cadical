@@ -1,5 +1,6 @@
 import functools
 import collections
+import random
 
 from past.builtins import basestring
 from six import iterkeys, itervalues
@@ -101,6 +102,7 @@ def __type_annotations_factory():
         """
         if hasattr(f, 'rtype') and hasattr(f, '__params'):
             register_first_class_function(f)
+            update_type_table()
             return True
 
     def allowed_children_factory(param_types):
@@ -206,10 +208,11 @@ def ignore(failure_value, *exceptions):
     return decorator
 
 
-def type_possibility_tables():
-    grow_type_table = [collections.defaultdict(set) for _ in range(MAX_DEPTH_LIMIT)]
-    full_type_table = [collections.defaultdict(set) for _ in range(MAX_DEPTH_LIMIT)]
+grow_type_table = [collections.defaultdict(set) for _ in range(MAX_DEPTH_LIMIT)]
+full_type_table = [collections.defaultdict(set) for _ in range(MAX_DEPTH_LIMIT)]
 
+
+def update_type_table():
     for t in REGISTERED_TYPES:
         t_funcs = lookup_rtype(t)
         for func in t_funcs:
@@ -229,4 +232,14 @@ def type_possibility_tables():
                         grow_type_table[i][t].add(func)
                     if all(full_check):
                         full_type_table[i][t].add(func)
-    return grow_type_table, full_type_table
+
+
+def RHH(rtype):
+    if random.random() < 0.5:
+        depth = MAX_DEPTH_LIMIT - 1
+        strategy = 'grow'
+    else:
+        cand = [_ for _ in range(MAX_DEPTH_LIMIT) if full_type_table[_][rtype]]
+        depth = random.choice(cand)
+        strategy = 'full'
+    return depth, strategy

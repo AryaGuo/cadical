@@ -1,18 +1,17 @@
-import random
 import collections
 import copy
+import random
 
 from past.builtins import xrange
 
-from monkeys.config import MAX_DEPTH_LIMIT
-from monkeys.typing import lookup_rtype, rtype, params, prettify_converted_type, lookup_convert, type_possibility_tables
 from monkeys.exceptions import UnsatisfiableType, TreeConstructionError
+from monkeys.typing import lookup_rtype, rtype, params, prettify_converted_type, lookup_convert, RHH, full_type_table, \
+    grow_type_table
 
 _REGISTERED_INPUTS = {}
 
 
 class Node(object):
-
     def __init__(self, f, allowed_functions=None, selection_strategy=None, init_list=None, depth=None,
                  build_strategy='grow'):  # build_strategy: "grow"/"full"
         self.f = f
@@ -24,7 +23,6 @@ class Node(object):
                 [child for child in child_list if child in allowed_functions]
                 for child_list in allowed_children
             ]
-        grow_type_table, full_type_table = type_possibility_tables()
         type_table = grow_type_table if build_strategy == 'grow' else full_type_table
         allowed_children = [
             [child for child in child_list if child in type_table[depth][child.rtype]]
@@ -145,12 +143,7 @@ def build_tree(return_type, allowed_functions=None, convert=True, selection_stra
     starting_functions = find_functions(return_type, allowed_functions, convert)
     for __ in xrange(99999):
         try:
-            if random.random() < 0.5:
-                depth = MAX_DEPTH_LIMIT - 1
-                strategy = 'grow'
-            else:
-                depth = random.randrange(0, MAX_DEPTH_LIMIT)
-                strategy = 'full'
+            depth, strategy = RHH(return_type)
             return Node(
                 random.choice(starting_functions),
                 allowed_functions=allowed_functions,

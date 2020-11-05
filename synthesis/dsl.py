@@ -149,7 +149,8 @@ class Scheme:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
-            subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True, capture_output=True)
+            subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
+                           capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()
@@ -659,15 +660,6 @@ def main():
         gp.report(len(schemes))
         return
 
-    temp = vars(Config)
-    cfg_str = ' --- Config ---\n'
-    for item in temp:
-        cfg_str += '\t' + item + ' = ' + str(temp[item]) + '\n'
-    cfg_str += '--- End of config ---\n'
-    logging.info(cfg_str)
-    seed = get_seed()
-    random.seed(seed)
-    logging.info('Random seed: {}'.format(seed))
     try:
         run_gp()
     except AssertionError as err:
@@ -747,6 +739,18 @@ if __name__ == '__main__':
     stdoutLogger = logging.StreamHandler(sys.stdout)
     stdoutLogger.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(stdoutLogger)
+
+    temp = vars(Config)
+    cfg_str = ' --- Config ---\n'
+    for item in temp:
+        cfg_str += '\t' + item + ' = ' + str(temp[item]) + '\n'
+    cfg_str += '--- End of config ---\n'
+    logging.info(cfg_str)
+    seed = get_seed()
+    random.seed(seed)
+    logging.info('Random seed: {}'.format(seed))
+    logging.info(args)
+
     if args.monkey:
         monkey()
     else:
