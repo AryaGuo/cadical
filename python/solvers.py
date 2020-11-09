@@ -127,7 +127,7 @@ def main():
                         fout = str(output_root) + '/' + '{}.txt'.format(fin.stem)
                         pool.apply_async(worker, args=(total_count, fin, fout, args), callback=cal_result)
         else:
-            for fin in Path(args.input_folder).rglob('*.cnf'):
+            for fin in Path(args.input_folder).rglob('*.cnf*'):
                 total_count += 1
                 # fout = output_root / '{}.txt'.format(fin.stem)
                 fout = str(output_root) + '/' + '{}.txt'.format(fin.stem)

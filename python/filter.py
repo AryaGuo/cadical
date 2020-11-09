@@ -17,6 +17,7 @@ with open('python/main18.csv') as csvfile:
             if float(row['solver time']) <= args.threshold:
                 cnt += 1
                 filelist.append(Path(row['benchmark']).stem)
+                filelist.append(Path(row['benchmark']).name)
 
 with open('python/problems.txt', 'w') as fout:
     for it in filelist:

@@ -74,7 +74,7 @@ class Scheme:
         logging.info('-----')
         for code in self.code:
             logging.info(code)
-        logging.info('-----')
+        logging.info('-----\n')
 
     def dsl_to_cpp_(self, parse_tree, term_stabs: dict):
         if type(parse_tree) == Tree:
@@ -162,18 +162,14 @@ class Scheme:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
-            subprocess.run('cd ..; python python/filter.py -T ' + str(Config.threshold), shell=True, check=True,
-                           capture_output=True)
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
                            capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()
-            process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
-                                     'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
-                                     '$DIRNAME'.format(output_dir),
-                                     shell=True, check=True, capture_output=True)
-            out = process.stdout.decode()
+            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir), shell=True, check=True,
+                                     capture_output=True)
+            out = process.stdout.decode().strip()
             logging.info(out)
             out = out.split()
             solved, rtime = int(out[0]), float(out[-1][:-1])
@@ -701,10 +697,10 @@ def monkey():
             cpp_file.writelines(code)
 
     def display(codes):
-        logging.info('--- Begin of codes ---')
+        logging.info('-----')
         for code in codes:
             logging.info(code)
-        logging.info('--- End of codes ---')
+        logging.info('-----\n')
 
     @require()
     @params('heuristic')
@@ -716,11 +712,9 @@ def monkey():
                 return -sys.maxsize
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
                            capture_output=True)
-            process = subprocess.run('BACKUPDIR=$(ls -td ../output/*/ | head -1); DIRNAME=$(basename $BACKUPDIR);'
-                                     'python ../python/gen_csv.py -S "cadical" -D ~/Main-18/ -I $BACKUPDIR -O {} -N '
-                                     '$DIRNAME'.format(output_dir),
-                                     shell=True, check=True, capture_output=True)
-            out = process.stdout.decode()
+            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir), shell=True, check=True,
+                                     capture_output=True)
+            out = process.stdout.decode().strip()
             logging.info(out)
             out = out.split()
             solved, rtime = int(out[0]), float(out[-1][:-1])
@@ -748,6 +742,14 @@ def test_build_tree():
             print(code)
     else:
         print(codes)
+
+
+def init_dataset():
+    logging.info('\nFiltering datasets for evaluation...')
+    filtering = subprocess.run('cd ..; python python/filter.py -T ' + str(Config.threshold), shell=True, check=True,
+                               capture_output=True)
+    out = filtering.stdout.decode().strip()
+    logging.info(out + ' problems in total\n')
 
 
 if __name__ == '__main__':
@@ -779,6 +781,7 @@ if __name__ == '__main__':
     logging.info('Random seed: {}'.format(seed))
     logging.info(args)
 
+    init_dataset()
     if args.monkey:
         monkey()
     else:
