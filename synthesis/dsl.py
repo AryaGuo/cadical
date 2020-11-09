@@ -24,6 +24,7 @@ from monkey import grammar
 
 class Node:
     def __init__(self, type, data=None, parent=None, children=None):
+        # print('new node', type, data, children)
         self.type = type  # name of TERM/RULE
         self.data = data  # terminal string/None for rule
         self.is_term = self.data is not None
@@ -31,12 +32,23 @@ class Node:
         self.depth = 1
         self.size = 1
         if children:
-            self.children = children
+            self.update_children(children)
         else:
             self.children = []
+
+    def update_children(self, children: list):
+        self.depth = 1
+        self.size = 1
+        self.children = children
         for c in self.children:
             self.depth = max(self.depth, c.depth + 1)
             self.size += c.size
+
+    def display(self, level=0):
+        indent = '\t' * level
+        logging.debug(indent, self.data if self.data else self.type)
+        for c in self.children:
+            c.display(level + 1)
 
 
 class Scheme:
@@ -149,6 +161,8 @@ class Scheme:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
+            subprocess.run('cd ..; python python/filter.py -T ' + str(Config.threshold), shell=True, check=True,
+                           capture_output=True)
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
                            capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
@@ -185,6 +199,9 @@ class DSL:
             self.rule_dict, self.token_dict = self.__init_dicts(self.grammar_tree)
             # self.rule_dict: Dictionary of rules (rule's name->parse tree)
             # self.token_dict: Dictionary of tokens (token's name->parse tree)
+
+    def gen_random_node(self, rule, depth):
+        return self.__gen_random_node(self.rule_dict[rule], depth)
 
     def gen_random_scheme(self, rule, depth):
         return self.get_scheme_from_dsl(self.__gen_random_dsl(self.rule_dict[rule], depth))
@@ -268,50 +285,33 @@ class DSL:
         :param depth: Recursive depth limits for subtrees.
         :return: A random string satisfying the grammar rule.
         """
-        # print('[gen_random @ {}]'.format(depth), parse_tree)
+        # print('[gen_random @ {}]'.format(depth), rule)
 
         if depth < 0:
             return None
 
         if type(rule) == Token:
             if rule.type == 'TOKEN':
-                return self.__gen_random_dsl(self.token_dict[rule], depth)
+                return self.__gen_random_node(self.token_dict[rule], depth - 1)
             elif rule.type == 'STRING':
-                return rule.strip('"')
+                return Node('string', rule.strip('"'))  # todo: type
             elif rule.type == 'RULE':
-                return self.__gen_random_dsl(self.rule_dict[rule], depth)
+                return self.__gen_random_node(self.rule_dict[rule], depth - 1)
             else:
-                return rule
-                # raise Exception('Error: Unknown token type', parse_tree.type)
+                raise Exception('Error: Unknown token type', rule.type)
 
         assert type(rule) == Tree, rule
 
-        sample = ''
-
-        if rule.data == 'token':
-            name = rule.children[0]
+        if rule.data == 'token' or rule.data == 'rule':
+            name = rule.children[0].lstrip('?!')
             expansions = rule.children[-1]
             child = self.__gen_random_node(expansions, depth)
-            node = Node(name, children=[child])
-            child.parent = node
-            return node
-        if rule.data == 'rule':
-            name = rule.children[0]
-            expansions = rule.children[-1]
-            child = self.__gen_random_node(expansions, depth)
+            if type(child) is not list:
+                child = [child]
             node = Node(name, children=child)
-            child.parent = node
+            for c in node.children:
+                c.parent = node
             return node
-
-        if rule.data == 'rule' or rule.data == 'token':
-            return self.__gen_random_dsl(rule.children[-1], depth)
-        elif rule.data == 'expansion':
-            for c in rule.children:
-                substr = self.__gen_random_dsl(c, depth - 1)
-                if substr is None:
-                    return None
-                sample += substr
-            return sample
         elif rule.data == 'expansions':
             expansions = rule.children
             wt_lst = []
@@ -324,21 +324,33 @@ class DSL:
             for i in range(Config.gen_restart):
                 # n = random.randrange(len(expansions))
                 n = random.choices(range(len(expansions)), weights=wt_lst)[0]
-                substr = self.__gen_random_dsl(expansions[n], depth - 1)
-                if substr is not None:
-                    return substr
+                child = self.__gen_random_node(expansions[n], depth)
+                if child is not None:
+                    return child
             return None
+        elif rule.data == 'expansion':
+            children = []
+            for c in rule.children:
+                child = self.__gen_random_node(c, depth)
+                if child is None:
+                    return None
+                elif child == '':
+                    continue
+                children.append(child)
+            if len(children) == 1:
+                return children[0]
+            return children
         elif rule.data == 'expr':
             OP = rule.children[-1]
             assert OP.type == 'OP', OP
             if '?' in OP:
                 coin = random.random()
                 if coin < Config.OP_prob:
-                    return self.__gen_random_dsl(rule.children[0], depth - 1)
+                    return self.__gen_random_node(rule.children[0], depth)
                 else:
                     return ''
         else:
-            return self.__gen_random_dsl(rule.children[0], depth)
+            raise Exception('Error: Unknown rule.data', rule.data)
 
     def __gen_random_tree(self, rule, depth, is_token=False):
         dsl_str = self.__gen_random_dsl(rule, depth)
@@ -511,11 +523,11 @@ class DSL:
             elif rule.data == 'token':
                 key = rule.children[0]
                 token_dict[key] = rule.children[-1]
-        for rule in tree.children:
-            if rule.data == 'rule' and type(rule.children[2]) == Tree and rule.children[2].data == 'expansions':
-                for c in rule.children[2].children:
-                    if c.data == 'alias':
-                        rule_dict[c.children[-1]] = c.children[0]
+        # for rule in tree.children:
+        #     if rule.data == 'rule' and type(rule.children[-1]) == Tree and rule.children[-1].data == 'expansions':
+        #         for c in rule.children[-1].children:
+        #             if c.data == 'alias':
+        #                 rule_dict[c.children[-1]] = c.children[0]
         return rule_dict, token_dict
 
 
@@ -620,7 +632,7 @@ class GP:
         self.__crossover(ta, tb)
 
     def test_gen_random(self):
-        s = self.dsl.gen_random_scheme('heuristic', self.depth_lim)
+        s = self.dsl.gen_random_node('heuristic', self.depth_lim)
         s.display()
 
 
@@ -715,10 +727,10 @@ def monkey():
                                                         crossover_rate=Config.crossover_rate,
                                                         mutation_rate=Config.mutation_rate))
     codes = winner.evaluate()
-    print('--- Winner\'s codes ---')
+    logging.info('--- Winner\'s codes ---')
     for code in codes:
-        print(code)
-    print('--- End of codes ---')
+        logging.info(code)
+    logging.info('--- End of codes ---')
 
 
 if __name__ == '__main__':

@@ -33,3 +33,16 @@ gen1 = """
         if (i >= i)
             ninc = lhs;
 """
+
+hard_37 = """
+        if (128 + i % i == i * i)
+            unbumped = lhs / i + i + i * i * lhs;
+        bumped = lhs + inc;
+        if (32 >= 6)
+            ninc = lhs + lhs / 256; 
+"""
+
+dsl_36 = """
+        bumped = inc / i + i / i / 0.9;
+        ninc = i / 8 + inc;
+"""

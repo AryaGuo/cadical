@@ -10,7 +10,7 @@ cnt = 0
 
 filelist = []
 
-with open('main18.csv') as csvfile:
+with open('python/main18.csv') as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         if row['solver'] == 'CaDiCaL':
@@ -18,7 +18,7 @@ with open('main18.csv') as csvfile:
                 cnt += 1
                 filelist.append(Path(row['benchmark']).stem)
 
-with open('problems.txt', 'w') as fout:
+with open('python/problems.txt', 'w') as fout:
     for it in filelist:
         fout.write(it + '\n')
 

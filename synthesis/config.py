@@ -6,13 +6,14 @@ class Config:
     tournament_size = 2
     elitism = True
     seed = None
-    epoch = 20
-    mutation_rate = 0.2
+    epoch = 50
+    mutation_rate = 0.1
     crossover_rate = 0.9
     gen_restart = 50
     save = 1
     report = 5
     time_lim = 60
+    threshold = 60
 
     wt = dict()
     wt['LHS'] = 1
