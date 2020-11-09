@@ -126,19 +126,19 @@ def geq_float(a, b):
 @params(bool, float, float)
 @rtype(float)
 def condition_float(a, b, c):
-    return '{} ? {} : {}'.format(a, b, c)
+    return '({} ? {} : {})'.format(a, b, c)
 
 
 @params(bool, int, int)
 @rtype(int)
 def condition_int(a, b, c):
-    return '{} ? {} : {}'.format(a, b, c)
+    return '({} ? {} : {})'.format(a, b, c)
 
 
 @params(bool, 'nonzero', 'nonzero')
 @rtype('nonzero')
 def condition_nonzero(a, b, c):
-    return '{} ? {} : {}'.format(a, b, c)
+    return '({} ? {} : {})'.format(a, b, c)
 
 
 @params(float)

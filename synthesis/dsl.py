@@ -699,6 +699,13 @@ def monkey():
         with open('analyze.cpp', 'w') as cpp_file:
             cpp_file.writelines(code)
 
+    def display(heuristic):
+        codes = heuristic.evaluate()
+        logging.info('--- Begin of codes ---')
+        for code in codes:
+            logging.info(code)
+        logging.info('--- End of codes ---')
+
     @require()
     @params('heuristic')
     def score(heuristic):
@@ -716,6 +723,7 @@ def monkey():
             logging.info(out)
             out = out.split()
             solved, rtime = int(out[0]), float(out[-1][:-1])
+            display(heuristic)
             return 30 * solved ** 2 + 60 / rtime
         except subprocess.CalledProcessError as err:
             logging.error(err)
@@ -726,11 +734,7 @@ def monkey():
                       next_generation=functools.partial(next_generation, select_fn=select_fn,
                                                         crossover_rate=Config.crossover_rate,
                                                         mutation_rate=Config.mutation_rate))
-    codes = winner.evaluate()
-    logging.info('--- Winner\'s codes ---')
-    for code in codes:
-        logging.info(code)
-    logging.info('--- End of codes ---')
+    display(winner)
 
 
 if __name__ == '__main__':
