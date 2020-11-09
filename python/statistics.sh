@@ -1,5 +1,5 @@
 export PROJ_DIR=$(realpath $(dirname $(dirname $0)))
-export DATA_DIR=$(realpath ~/codelab/Main-18-bz2/)
+export DATA_DIR=$(realpath ~/Main-18/)
 export BACKUPDIR=$(ls -td $PROJ_DIR/output/*/ | head -1)
 export DIRNAME=$(basename $BACKUPDIR)
 
