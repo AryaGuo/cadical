@@ -16,9 +16,10 @@ sys.path.append(str(curPath.parents[1]))
 
 from synthesis.config import Config
 
-from monkeys import optimize, tournament_select, next_generation
+from monkeys import optimize, tournament_select, next_generation, build_tree
 from monkeys.typing import params
-from monkeys.search import require
+from monkeys.search import require, pre_evaluate
+from monkey.grammar import selection_strategy
 from monkey import grammar
 
 
@@ -690,7 +691,7 @@ def monkey():
         with open('analyze_blank.cpp', 'r') as cpp_file:
             code = cpp_file.readlines()
         for j in range(3):
-            code_snippet = codes.evaluate()[j].splitlines()
+            code_snippet = codes[j].splitlines()
             for i in range(len(code_snippet)):
                 code_snippet[i] = '\t\t' + code_snippet[i]
             code_snippet = '\n'.join(code_snippet)
@@ -699,8 +700,7 @@ def monkey():
         with open('analyze.cpp', 'w') as cpp_file:
             cpp_file.writelines(code)
 
-    def display(heuristic):
-        codes = heuristic.evaluate()
+    def display(codes):
         logging.info('--- Begin of codes ---')
         for code in codes:
             logging.info(code)
@@ -708,6 +708,7 @@ def monkey():
 
     @require()
     @params('heuristic')
+    @pre_evaluate
     def score(heuristic):
         try:
             embed_cadical(heuristic)
@@ -729,12 +730,24 @@ def monkey():
             logging.error(err)
             return -sys.maxsize
 
+    build_tree_ = functools.partial(build_tree, selection_strategy=selection_strategy)
     select_fn = functools.partial(tournament_select, selection_size=Config.tournament_size)
     winner = optimize(score, iterations=Config.epoch, population_size=Config.pop_size,
-                      next_generation=functools.partial(next_generation, select_fn=select_fn,
+                      next_generation=functools.partial(next_generation, select_fn=select_fn, build_tree=build_tree_,
                                                         crossover_rate=Config.crossover_rate,
                                                         mutation_rate=Config.mutation_rate))
     display(winner)
+
+
+def test_build_tree():
+    tp = 'heuristic'
+    node = build_tree(tp, selection_strategy=selection_strategy)
+    codes = node.evaluate()
+    if tp == 'heuristic':
+        for code in codes:
+            print(code)
+    else:
+        print(codes)
 
 
 if __name__ == '__main__':

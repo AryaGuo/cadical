@@ -143,7 +143,7 @@ def build_tree(return_type, allowed_functions=None, convert=True, selection_stra
     starting_functions = find_functions(return_type, allowed_functions, convert)
     for __ in xrange(99999):
         try:
-            depth, strategy = RHH(return_type)
+            depth, strategy = RHH(return_type, convert)
             return Node(
                 random.choice(starting_functions),
                 allowed_functions=allowed_functions,

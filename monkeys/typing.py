@@ -5,7 +5,7 @@ import random
 from past.builtins import basestring
 from six import iterkeys, itervalues
 
-from monkeys.config import MAX_DEPTH_LIMIT
+from monkeys.config import MAX_DEPTH_LIMIT, GROW_PROB
 
 REGISTERED_TYPES = set()
 _STRING_TYPE_MAPPINGS = {}
@@ -143,22 +143,33 @@ def __type_annotations_factory():
 
         return decorator
 
-    def constant(return_type, value):
+    def priority(weight: int):
+        """Weights in selection strategy."""
+
+        def decorator(f):
+            f.priority = weight
+            return f
+
+        return decorator
+
+    def constant(return_type, value, weight):
         """Register a constant value under the given type."""
 
         @params()
         @rtype(return_type)
+        @priority(weight)
         def _const():
             return value
 
         _const.__name__ += '_' + str(value)
         return value
 
-    def free(target_type, source_type):
+    def free(target_type, source_type, weight):
         """Allow free one-way conversion from source type to target type."""
 
         @params(source_type)
         @rtype(target_type)
+        @priority(weight)
         def _convert(x):
             return x
 
@@ -188,10 +199,10 @@ def __type_annotations_factory():
                 return func
         return None
 
-    return rtype, params, constant, free, lookup_rtype, deregister, lookup_convert
+    return rtype, params, priority, constant, free, lookup_rtype, deregister, lookup_convert
 
 
-rtype, params, constant, free, lookup_rtype, deregister, lookup_convert = __type_annotations_factory()
+rtype, params, priority, constant, free, lookup_rtype, deregister, lookup_convert = __type_annotations_factory()
 
 
 def ignore(failure_value, *exceptions):
@@ -234,8 +245,9 @@ def update_type_table():
                         full_type_table[i][t].add(func)
 
 
-def RHH(rtype):
-    if random.random() < 0.5:
+def RHH(rtype, convert):
+    rtype = (convert_type if convert else __id)(rtype)
+    if random.random() < GROW_PROB:
         depth = MAX_DEPTH_LIMIT - 1
         strategy = 'grow'
     else:
