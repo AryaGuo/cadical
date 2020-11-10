@@ -12,25 +12,26 @@ def cactus_plot(args):
     mksc = iter(['x:', 'o:', 's:', 'v:', '<:', '>:', 'P:', 'd:', '.:', '*:', 'D:'])
 
     plt.figure()
-    for fin in sorted(Path(args.baseline_dir).rglob('*.csv')):
-        if fin.stem == 'final':
-            continue
-        px, py = [0], [0]
-        rtime = []
-        name = fin.stem
-        with open(fin) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                sat = row['verdict']
-                if sat != 'UNKNOWN':
-                    rtime.append(float(row['time']))
-        rtime.sort()
-        for i, j in enumerate(rtime):
-            if j > args.time_lim:
-                break
-            px.append(i)
-            py.append(j)
-        plt.plot(px, py, mks.__next__(), label=name, alpha=0.5, markersize=5)
+    if args.baseline:
+        for fin in sorted(Path(args.baseline_dir).rglob('*.csv')):
+            if fin.stem == 'final':
+                continue
+            px, py = [0], [0]
+            rtime = []
+            name = fin.stem
+            with open(fin) as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    sat = row['verdict']
+                    if sat != 'UNKNOWN':
+                        rtime.append(float(row['time']))
+            rtime.sort()
+            for i, j in enumerate(rtime):
+                if j > args.time_lim:
+                    break
+                px.append(i)
+                py.append(j)
+            plt.plot(px, py, mks.__next__(), label=name, alpha=0.5, markersize=5)
 
     regex = re.compile(args.re)
     for fin in sorted(Path(args.input_dir).rglob('*.csv')):
