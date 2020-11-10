@@ -23,14 +23,14 @@ heuristic: assign_unbumped? assign_new_score assign_score_inc?
 !assign_new_score: BUMPED "=" expr ";"
 !assign_score_inc: condition? NEW_SCORE_INC "=" expr ";"
 
-expr: sum
-!sum: prod
+?expr: sum
+!?sum: prod
     | sum "+" prod
     | sum "-" prod
-!prod: atom
+!?prod: atom
     | prod "*" atom
     | prod "/" atom
-!atom: NUMBER
+!?atom: NUMBER
     | POWER
     | DECIMAL
     | CONFLICT_INDEX
@@ -38,13 +38,13 @@ expr: sum
     | "(" sum ")"
     | LHS
 
-bool_expr: bool_sum
-!bool_sum: bool_prod
+?bool_expr: bool_sum
+!?bool_sum: bool_prod
     | bool_sum "+" bool_prod
-!bool_prod: bool_atom
+!?bool_prod: bool_atom
     | bool_prod "*" bool_atom
     | bool_prod "%" bool_atom
-!bool_atom: NUMBER
+!?bool_atom: NUMBER
     | POWER
     | CONFLICT_INDEX
     | "(" bool_sum ")"
