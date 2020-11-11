@@ -143,7 +143,7 @@ def __type_annotations_factory():
 
         return decorator
 
-    def priority(weight: int):
+    def priority(weight: int = 1):
         """Weights in selection strategy."""
 
         def decorator(f):

@@ -108,7 +108,7 @@ def main():
     parser.add_argument('-T', '--time_lim', default=5000, type=float)
     parser.add_argument('-R', '--re', default='.*', type=str)
     parser.add_argument('-B', '--baseline', action='store_true')
-    parser.add_argument('-D', '--baseline_dir', default='baseline', type=str)
+    parser.add_argument('-D', '--baseline_dir', default='result/baseline', type=str)
     parser.add_argument('-L', '--label', action='store_true')
     args = parser.parse_args()
     cactus_plot(args)

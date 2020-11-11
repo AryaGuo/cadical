@@ -24,35 +24,6 @@ from monkey.grammar import selection_strategy
 from monkey import grammar
 
 
-class Node_:
-    def __init__(self, type, data=None, parent=None, children=None):
-        # print('new node', type, data, children)
-        self.type = type  # name of TERM/RULE
-        self.data = data  # terminal string/None for rule
-        self.is_term = self.data is not None
-        self.parent = parent
-        self.depth = 1
-        self.size = 1
-        if children:
-            self.update_children(children)
-        else:
-            self.children = []
-
-    def update_children(self, children: list):
-        self.depth = 1
-        self.size = 1
-        self.children = children
-        for c in self.children:
-            self.depth = max(self.depth, c.depth + 1)
-            self.size += c.size
-
-    def display(self, level=0):
-        indent = '\t' * level
-        logging.debug(indent, self.data if self.data else self.type)
-        for c in self.children:
-            c.display(level + 1)
-
-
 class Node:
     def __init__(self, obj, parent, index):
         if type(obj) == Tree:
@@ -69,7 +40,16 @@ class Node:
         if self.parent is None:
             self.depth = 1
         else:
-            self.depth = parent.depth + 1
+            self.depth = self.parent.depth + 1
+
+    def update_subtree(self):
+        if self.parent is None:
+            self.depth = 1
+        else:
+            self.depth = self.parent.depth + 1
+        if not self.is_token:
+            for c in self.children:
+                c.update_subtree()
 
     def build_type_dict(self, d: dict, token_dict, banned):
         if self.is_token:
@@ -111,7 +91,7 @@ class Node:
 class Scheme:
     """
     Describes a specific heuristic scheme.
-    Can be described by dsl(str), a parse tree(lark.Tree) or a c++ code snippet.
+    Can be described by dsl(str), a parse tree(Node) or a c++ code snippet.
     """
 
     def __init__(self, rule_dict, token_dict, dsl, tree, name=None):
@@ -119,8 +99,8 @@ class Scheme:
         self.token_dict = token_dict
         self.dsl = dsl
         self.tree = Node.convert_tree(tree, None, None)
-        self.code = self.dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.eval_fitness
+        self.code = self.__dsl_to_cpp(self.tree)
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness
         if name is not None and self.file is not None:
             dst = self.file.parent / (name + '.csv')
             shutil.move(self.file, dst)
@@ -132,13 +112,13 @@ class Scheme:
             logging.info(code)
         logging.info('-----\n')
 
-    def dsl_to_cpp_(self, parse_tree: Node, term_stabs: dict):
-        if not parse_tree.is_token:
+    def __dsl_to_cpp_(self, tree: Node, term_stabs: dict):
+        if not tree.is_token:
             ret = ''
             first = True
             if_body = False
-            for c in parse_tree.children:
-                if c.is_token and c.value == 'unbumped' and parse_tree.data == 'assign_unbumped':
+            for c in tree.children:
+                if c.is_token and c.value == 'unbumped' and tree.data == 'assign_unbumped':
                     ret += 'for (auto var : vars) {\n\t'
                     first = True
                 if if_body and first:
@@ -146,45 +126,40 @@ class Scheme:
                 if not first:
                     ret += ' '
                 first = False
-                ret += self.dsl_to_cpp_(c, term_stabs)
+                ret += self.__dsl_to_cpp_(c, term_stabs)
                 if not c.is_token and c.data == 'condition':
                     if_body = True
                     ret += ' {\n\t'
-            if parse_tree.data == 'assign_unbumped':
+            if tree.data == 'assign_unbumped':
                 ret += '\n\t}' if if_body else '\n}'
             if if_body:
                 ret += '\n}'
             return ret
-        elif parse_tree.is_token:
-            # print('type', parse_tree.type, parse_tree)
-            if parse_tree.type in term_stabs:
-                return term_stabs[parse_tree.type]
+        elif tree.is_token:
+            if tree.type in term_stabs:
+                return term_stabs[tree.type]
             else:
-                return parse_tree.value
+                return tree.value
 
-    def dsl_to_cpp(self, parse_tree: Node):
-        assert type(parse_tree) == Node, parse_tree
-        assert parse_tree.data == 'start', parse_tree
+    def __dsl_to_cpp(self, tree: Node):
+        assert type(tree) == Node, tree
+        assert tree.data == 'start', tree
 
-        parse_tree = parse_tree.children[0]  # todo
+        tree = tree.children[0]
 
-        codes = ['', '', '']
+        codes = [''] * 3
         term_subs = {'CONFLICT_INDEX': 'stats.conflicts', 'SCORE_INC': 'score_inc', 'UNBUMPED': 'stab[var]',
                      'BUMPED': 'new_score', 'NEW_SCORE_INC': 'new_score_inc'}
-        for c in parse_tree.children:
-            code = ''
+        for c in tree.children:
             if c.data == 'assign_unbumped':
                 term_subs['LHS'] = 'stab[var]'
-                code += self.dsl_to_cpp_(c, term_subs)
-                codes[0] = code
+                codes[0] = self.__dsl_to_cpp_(c, term_subs)
             elif c.data == 'assign_new_score':
                 term_subs['LHS'] = 'old_score'
-                code += self.dsl_to_cpp_(c, term_subs)
-                codes[1] = code
+                codes[1] = self.__dsl_to_cpp_(c, term_subs)
             elif c.data == 'assign_score_inc':
                 term_subs['LHS'] = 'score_inc'
-                code += self.dsl_to_cpp_(c, term_subs)
-                codes[2] = code
+                codes[2] = self.__dsl_to_cpp_(c, term_subs)
         return codes
 
     @staticmethod
@@ -211,8 +186,7 @@ class Scheme:
             return False
         return True
 
-    @property
-    def eval_fitness(self):
+    def __eval_fitness(self):
         # return 40, 1.0, 100, None
         try:
             self.embed_cadical(self.code)
@@ -238,8 +212,8 @@ class Scheme:
 
     def update(self, new_tree):
         self.tree = Node.convert_tree(new_tree, None, None)
-        self.code = self.dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.eval_fitness
+        self.code = self.__dsl_to_cpp(self.tree)
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness
 
 
 class DSL:
@@ -250,11 +224,6 @@ class DSL:
         with open(grammar_file) as grammar:
             self.grammar_tree = meta_parser.parse(grammar.read())
             self.rule_dict, self.token_dict, self.single_terminals = self.__init_dicts(self.grammar_tree)
-            # self.rule_dict: Dictionary of rules (rule's name->parse tree)
-            # self.token_dict: Dictionary of tokens (token's name->parse tree)
-
-    def gen_random_node(self, rule, depth):
-        return self.__gen_random_node(self.rule_dict[rule], depth)
 
     def gen_random_scheme(self, rule, depth):
         return self.get_scheme_from_dsl(self.__gen_random_dsl(self.rule_dict[rule], depth))
@@ -288,7 +257,6 @@ class DSL:
                 return self.__gen_random_dsl(self.rule_dict[parse_tree], depth)
             else:
                 return parse_tree
-                # raise Exception('Error: Unknown token type', parse_tree.type)
 
         assert type(parse_tree) == Tree, parse_tree
 
@@ -313,7 +281,6 @@ class DSL:
                         cur += Config.wt[token]
                 wt_lst.append(cur)
             for i in range(Config.gen_restart):
-                # n = random.randrange(len(expansions))
                 n = random.choices(range(len(expansions)), weights=wt_lst)[0]
                 substr = self.__gen_random_dsl(expansions[n], depth - 1)
                 if substr is not None:
@@ -331,80 +298,6 @@ class DSL:
         else:
             return self.__gen_random_dsl(parse_tree.children[0], depth)
 
-    def __gen_random_node(self, rule, depth: int):
-        """
-        Generate a random instance from the specified grammar rule.
-        :param rule: Grammar rule in lark.Tree or lark.Token format.
-        :param depth: Recursive depth limits for subtrees.
-        :return: A random string satisfying the grammar rule.
-        """
-        # print('[gen_random @ {}]'.format(depth), rule)
-
-        if depth < 0:
-            return None
-
-        if type(rule) == Token:
-            if rule.type == 'TOKEN':
-                return self.__gen_random_node(self.token_dict[rule], depth - 1)
-            elif rule.type == 'STRING':
-                return Node_('string', rule.strip('"'))  # todo: type
-            elif rule.type == 'RULE':
-                return self.__gen_random_node(self.rule_dict[rule], depth - 1)
-            else:
-                raise Exception('Error: Unknown token type', rule.type)
-
-        assert type(rule) == Tree, rule
-
-        if rule.data == 'token' or rule.data == 'rule':
-            name = rule.children[0].lstrip('?!')
-            expansions = rule.children[-1]
-            child = self.__gen_random_node(expansions, depth)
-            if type(child) is not list:
-                child = [child]
-            node = Node_(name, children=child)
-            for c in node.children:
-                c.parent = node
-            return node
-        elif rule.data == 'expansions':
-            expansions = rule.children
-            wt_lst = []
-            for c in expansions:
-                cur = 1
-                for token in c.children:
-                    if type(token) == Token and token in Config.wt:
-                        cur += Config.wt[token]
-                wt_lst.append(cur)
-            for i in range(Config.gen_restart):
-                # n = random.randrange(len(expansions))
-                n = random.choices(range(len(expansions)), weights=wt_lst)[0]
-                child = self.__gen_random_node(expansions[n], depth)
-                if child is not None:
-                    return child
-            return None
-        elif rule.data == 'expansion':
-            children = []
-            for c in rule.children:
-                child = self.__gen_random_node(c, depth)
-                if child is None:
-                    return None
-                elif child == '':
-                    continue
-                children.append(child)
-            if len(children) == 1:
-                return children[0]
-            return children
-        elif rule.data == 'expr':
-            OP = rule.children[-1]
-            assert OP.type == 'OP', OP
-            if '?' in OP:
-                coin = random.random()
-                if coin < Config.OP_prob:
-                    return self.__gen_random_node(rule.children[0], depth)
-                else:
-                    return ''
-        else:
-            raise Exception('Error: Unknown rule.data', rule.data)
-
     def __gen_random_tree(self, rule, depth, is_token=False):
         dsl_str = self.__gen_random_dsl(rule, depth)
         if dsl_str is None:
@@ -414,11 +307,9 @@ class DSL:
             parser = Lark(grammar)
             if is_token:
                 ret = parser.parse(dsl_str).children[0]
-                # print('GEN', 'TOKEN', ret)
             else:
                 name = rule.children[0].lstrip('!?')
                 ret = parser.parse(dsl_str, name)
-                # print('GEN', name, ret)
             return ret
 
     def mutate(self, parse_tree, depth):
@@ -456,6 +347,7 @@ class DSL:
             return tree
         if rand_node.parent:
             rand_node.parent.children[rand_node.index] = other
+            other.update_subtree()
             return tree
         else:
             return other
@@ -475,7 +367,6 @@ class DSL:
 
     @staticmethod
     def __match(tree, rule, is_token):
-        # print('__match', tree, rule, is_token)
         if is_token:
             return type(tree) == Token and tree.type == rule
         else:
@@ -621,11 +512,6 @@ class DSL:
                 token_dict[key] = rule.children[-1]
                 if rule.children[-1].data == 'literal':
                     single_terminals.add(key)
-        # for rule in tree.children:
-        #     if rule.data == 'rule' and type(rule.children[-1]) == Tree and rule.children[-1].data == 'expansions':
-        #         for c in rule.children[-1].children:
-        #             if c.data == 'alias':
-        #                 rule_dict[c.children[-1]] = c.children[0]
         return rule_dict, token_dict, single_terminals
 
 
@@ -683,7 +569,6 @@ class GP:
         start_index = 0
         if self.elitism:
             start_index = 1
-            # finding the most elite member of last generation and sending it directly to new generation
             new_population.append(deepcopy(max(self.population, key=lambda x: x.fitness)))
 
         for i in range(start_index, self.pop_size):
@@ -727,15 +612,6 @@ class GP:
             return self.dsl.crossover_(scheme_0.tree, scheme_1.tree)
         return scheme_0.tree
 
-    def test_cross(self):
-        ta = self.dsl.gen_random_scheme('heuristic', 15)
-        tb = self.dsl.gen_random_scheme('heuristic', 15)
-        cross = self.__crossover(ta, tb)
-
-    def test_gen_random(self):
-        s = self.dsl.gen_random_scheme('heuristic', self.depth_lim)
-        print(s.tree)
-
 
 def run_gp():
     gp = GP(Config)
@@ -778,28 +654,6 @@ def main():
 
 
 def monkey():
-    def compile_cadical():
-        shutil.move('analyze.cpp', '../src/analyze.cpp')
-        try:
-            subprocess.run('cd .. ; make', shell=True, check=True, capture_output=True)  # ./configure && make
-        except subprocess.CalledProcessError:
-            return False
-        return True
-
-    def embed_cadical(codes):
-        SPLIT = [[182], [92, 99], [124, 131]]
-        with open('analyze_blank.cpp', 'r') as cpp_file:
-            code = cpp_file.readlines()
-        for j in range(3):
-            code_snippet = codes[j].splitlines()
-            for i in range(len(code_snippet)):
-                code_snippet[i] = '\t\t' + code_snippet[i]
-            code_snippet = '\n'.join(code_snippet)
-            for line in SPLIT[j]:
-                code.insert(line, code_snippet)
-        with open('analyze.cpp', 'w') as cpp_file:
-            cpp_file.writelines(code)
-
     def display(codes):
         logging.info('-----')
         for code in codes:
@@ -811,8 +665,8 @@ def monkey():
     @pre_evaluate
     def score(heuristic):
         try:
-            embed_cadical(heuristic)
-            if not compile_cadical():
+            Scheme.embed_cadical(heuristic)
+            if not Scheme.compile_cadical():
                 return -sys.maxsize
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
                            capture_output=True)
