@@ -100,7 +100,7 @@ class Scheme:
         self.dsl = dsl
         self.tree = Node.convert_tree(tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(Config.ratio)
         if name is not None and self.file is not None:
             dst = self.file.parent / (name + '.csv')
             shutil.move(self.file, dst)
@@ -186,7 +186,7 @@ class Scheme:
             return False
         return True
 
-    def __eval_fitness(self):
+    def __eval_fitness(self, ratio=True):
         # return 40, 1.0, 100, None
         try:
             self.embed_cadical(self.code)
@@ -197,15 +197,18 @@ class Scheme:
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()
-            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir), shell=True, check=True,
-                                     capture_output=True)
+            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(Config.time_lim),
+                                     shell=True, check=True, capture_output=True)
             out = process.stdout.decode().strip()
             logging.info(out)
-            out = out.split()
-            solved, rtime = int(out[0]), float(out[-1][:-1])
+            out = out.splitlines()
+            solved, rtime, score = int(out[0].split()[0]), float(out[-1].split()[3][:-1]), float(out[-1].split()[-1][:-1])
             csvfile = output_dir / (basename + '.csv')
             self.display()
-            return solved, rtime, 30 * solved ** 2 + 60 / rtime, csvfile  # todo
+            if ratio:
+                return solved, rtime, -score, csvfile
+            else:
+                return solved, rtime, 30 * solved ** 2 + 60 / rtime, csvfile
         except subprocess.CalledProcessError as err:
             logging.error(err)
             return 0, 0, -sys.maxsize, None
@@ -213,7 +216,7 @@ class Scheme:
     def update(self, new_tree):
         self.tree = Node.convert_tree(new_tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(Config.ratio)
 
 
 class DSL:
@@ -670,8 +673,8 @@ def monkey():
                 return -sys.maxsize
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
                            capture_output=True)
-            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir), shell=True, check=True,
-                                     capture_output=True)
+            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(Config.time_lim),
+                                     shell=True, check=True, capture_output=True)
             out = process.stdout.decode().strip()
             logging.info(out)
             out = out.split()

@@ -3,24 +3,25 @@ import csv
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-T", "--threshold", default=60.0, type=float)
+parser.add_argument("-T", "--threshold", default=6000, type=float)
 args = parser.parse_args()
 
 cnt = 0
 
-filelist = []
+input = 'python/main18.csv'
+output = 'python/problems.csv'
 
-with open('python/main18.csv') as csvfile:
+with open(input) as csvfile:
     reader = csv.DictReader(csvfile)
-    for row in reader:
-        if row['solver'] == 'CaDiCaL':
-            if float(row['solver time']) <= args.threshold:
-                cnt += 1
-                filelist.append(Path(row['benchmark']).stem)
-                filelist.append(Path(row['benchmark']).name)
-
-with open('python/problems.txt', 'w') as fout:
-    for it in filelist:
-        fout.write(it + '\n')
+    with open(output, 'w') as fout:
+        writer = csv.DictWriter(fout, fieldnames=['data_point', 'time'])
+        writer.writeheader()
+        for row in reader:
+            if row['solver'] == 'CaDiCaL':
+                t = row['solver time']
+                if float(t) <= args.threshold:
+                    cnt += 1
+                    writer.writerow({'data_point': Path(row['benchmark']).stem, 'time': t})
+                    writer.writerow({'data_point': Path(row['benchmark']).name, 'time': t})
 
 print(cnt)

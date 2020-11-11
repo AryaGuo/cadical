@@ -4,9 +4,10 @@ import csv
 from pathlib import Path
 
 
-def parse_output(solver, fout):
+def parse_output(solver, fout, baseline, timeout):
     rtime = None
     ans = 'UNKNOWN'
+    score = None
     if solver == 'cadical':
         ff = fout.readlines()
         for line in ff:
@@ -14,7 +15,10 @@ def parse_output(solver, fout):
             if len(line_lst) > 0 and line_lst[0] == 's':
                 ans = line_lst[1]
                 rtime = float(ff[-7].split()[-2])
+                score = rtime / baseline
                 break
+        if rtime is None:
+            score = timeout * 2 / baseline
     elif solver == 'minisat':
         ff = fout.readlines()
         if len(ff) > 0:
@@ -32,7 +36,7 @@ def parse_output(solver, fout):
                 break
     else:
         raise Exception('[parse_output] unknown solver')
-    return rtime, ans
+    return rtime, ans, score
 
 
 def main():
@@ -42,38 +46,45 @@ def main():
     parser.add_argument("-I", "--input_folder", required=True, type=str)
     parser.add_argument("-O", "--output_folder", required=True, type=str, default='~/result')
     parser.add_argument("-N", "--name", required=True, type=str)
+    parser.add_argument("-P", "--problems", required=True, default=None, type=str)
+    parser.add_argument("-T", "--timeout", default=3600, type=float)
     args = parser.parse_args()
 
     total_count = 0
     sat_count = 0
     unsat_count = 0
     time_sum = 0
+    sum_score = 0
 
-    data_root = Path(args.data_folder)
     csvfile = Path(args.output_folder.rstrip('/')) / (args.name + '.csv')
     with open(csvfile, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=['data_point', 'verdict', 'time'])
+        writer = csv.DictWriter(csvfile, fieldnames=['data_point', 'verdict', 'time', 'score'])
         writer.writeheader()
-        for fin in sorted(data_root.rglob('*.cnf*')):
-            data_name = Path(fin).relative_to(data_root)
-            fout = Path(args.input_folder) / '{}.txt'.format(fin.stem)
-            if Path.exists(fout):
-                with open(fout) as output:
-                    rtime, ans = parse_output(args.solver, output)
-                writer.writerow({'data_point': data_name, 'verdict': ans, 'time': rtime})
-                total_count += 1
-                if ans == 'SATISFIABLE':
-                    sat_count += 1
-                elif ans == 'UNSATISFIABLE':
-                    unsat_count += 1
-                if rtime is not None:
-                    time_sum += rtime
+
+        with open(args.problems) as problem_list:
+            reader = csv.DictReader(problem_list)
+            for row in reader:
+                data_name = row['data_point']
+                baseline = float(row['time'])
+                fout = Path(args.input_folder) / '{}.txt'.format(Path(data_name).stem)
+                if Path.exists(fout):
+                    with open(fout) as output:
+                        rtime, ans, score = parse_output(args.solver, output, baseline, args.timeout)
+                    writer.writerow({'data_point': data_name, 'verdict': ans, 'time': rtime})
+                    total_count += 1
+                    sum_score += score
+                    if ans == 'SATISFIABLE':
+                        sat_count += 1
+                    elif ans == 'UNSATISFIABLE':
+                        unsat_count += 1
+                    if rtime is not None:
+                        time_sum += rtime
 
     total_solved = sat_count + unsat_count
     avg_time = -1 if total_solved == 0 else time_sum / total_solved
-    print('{} out of {} solved, {} sat, {} unsat, {} time out'.format(total_solved, total_count, sat_count, unsat_count,
-                                                                      total_count - total_solved))
-    print('Average CPU time: {}s'.format(avg_time))
+    print('{} out of {} solved, {} sat, {} unsat, {} timeout'.format(total_solved, total_count, sat_count, unsat_count,
+                                                                     total_count - total_solved))
+    print('Average CPU time: {}. Average score = {}.'.format(avg_time, sum_score / total_count))
 
 
 if __name__ == "__main__":

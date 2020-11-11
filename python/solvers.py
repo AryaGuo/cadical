@@ -1,4 +1,5 @@
 import argparse
+import csv
 import logging
 import multiprocessing
 import subprocess
@@ -50,16 +51,6 @@ def cal_result(res):
                     unsat_count += 1
                     time_sum += run_time
                 break
-        # if len(ff) > 0:
-        #     sat = ff[-2].split()[-1]
-        #     # cpu_time = float(ff[-1].split()[-1])
-        #     # logging.info('Task {}, {}'.format(sat, cpu_time))
-        #     if sat == 'SATISFIABLE':
-        #         sat_count += 1
-        #         time_sum += run_time
-        #     elif sat == 'UNSATISFIABLE':
-        #         unsat_count += 1
-        #         time_sum += run_time
 
 
 def create_logger(log_file):
@@ -90,7 +81,7 @@ def main():
     parser.add_argument("-N", "--num_processes", default=16, type=int)
     parser.add_argument("-T", "--timeout", default=3600, type=float)
     parser.add_argument("-W", "--wait_timeout", default=10, type=int)
-    parser.add_argument("-P", "--problems", default=None, type=str)
+    parser.add_argument("-P", "--problems", required=True, default=None, type=str)
     parser.add_argument("-p", "--predict_folder", default="", type=str)
     parser.add_argument('-s', "--random_seed", default=1997, type=int)
     parser.add_argument('-X', "--arguments", type=str)
@@ -119,9 +110,10 @@ def main():
 
     try:
         if args.problems:
-            with open(args.problems) as filelist:
-                files = [x.strip() for x in filelist.readlines()]
-                for fname in files:
+            with open(args.problems) as problem_list:
+                reader = csv.DictReader(problem_list)
+                for row in reader:
+                    fname = row['data_point']
                     for fin in Path(args.input_folder).rglob(fname):
                         total_count += 1
                         fout = str(output_root) + '/' + '{}.txt'.format(fin.stem)
@@ -142,7 +134,7 @@ def main():
     logger.info(
         '{} out of {} solved, {} sat, {} unsat, {} timeout'.format(total_solved, total_count, sat_count, unsat_count,
                                                                    total_count - total_solved))
-    logger.info('Averge CPU time: {}'.format(avg_time))
+    logger.info('Average CPU time: {}'.format(avg_time))
 
 
 #	logger.info("# of tasks: {}".format(it))

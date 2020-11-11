@@ -7,5 +7,7 @@ python $PROJ_DIR/python/gen_csv.py \
 -S "cadical" \
 -D $DATA_DIR \
 -I $BACKUPDIR \
+-O $1 \
 -N $DIRNAME \
--O $1
+-P $PROJ_DIR/python/problems.csv \
+-T $2

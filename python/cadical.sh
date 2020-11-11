@@ -7,5 +7,5 @@ python $PROJ_DIR/python/solvers.py \
 -O $PROJ_DIR/output \
 -N 16 \
 -T $1 \
--P $PROJ_DIR/python/problems.txt \
+-P $PROJ_DIR/python/problems.csv \
 -X='--sat'
