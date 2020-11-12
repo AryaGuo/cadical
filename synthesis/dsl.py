@@ -342,11 +342,11 @@ class DSL:
         for _ in range(Config.gen_restart):
             rand_node = random.choice(nodes)
             if rand_node.is_token:
-                other = self.__gen_random_tree(self.token_dict[rand_node.type], Config.depth_lim - rand_node.depth + 1,
+                other = self.__gen_random_tree(self.token_dict[rand_node.type], Config.depth_lim - rand_node.depth,
                                                True)
             else:
                 other = self.__gen_random_tree(self.rule_dict[rand_node.data.lstrip('?!')],
-                                               Config.depth_lim - rand_node.depth + 1)
+                                               Config.depth_lim - rand_node.depth)
             if other is not None:
                 other = Node.convert_tree(other, rand_node.parent, rand_node.index)
                 break
@@ -355,37 +355,9 @@ class DSL:
             return tree
         if rand_node.parent:
             rand_node.parent.children[rand_node.index] = other
-            other.update_subtree()
             return tree
         else:
             return other
-
-    @staticmethod
-    def __match_expansions(tree_a, tree_b):
-        if len(tree_a.children) != len(tree_b.children):
-            return False
-        for i in range(len(tree_a.children)):
-            if type(tree_a.children[i]) == Tree:
-                if type(tree_a.children[i]) != Tree or tree_a.children[i].data != tree_b.children[i].data:
-                    return False
-            else:
-                if type(tree_a.children[i]) != Token or type(tree_b.children[i]) != Token:
-                    return False
-        return True
-
-    @staticmethod
-    def __match(tree, rule, is_token):
-        if is_token:
-            return type(tree) == Token and tree.type == rule
-        else:
-            return type(tree) == Tree and tree.data == rule
-
-    @staticmethod
-    def __match_node(tree_a, tree_b):
-        if type(tree_a) == Token:
-            return type(tree_b) == Token and tree_a.type == tree_b.type
-        else:
-            return type(tree_b) == Tree and tree_a.data == tree_b.data
 
     def crossover(self, tree_a, tree_b, depth):
         """
@@ -395,6 +367,19 @@ class DSL:
         :param depth: Current depth in the tree. Used to calculate probability.
         :return: Tree_a' with new branch.
         """
+
+        def __match(tree, rule, is_token):
+            if is_token:
+                return type(tree) == Token and tree.type == rule
+            else:
+                return type(tree) == Tree and tree.data == rule
+
+        def __match_node(tree_a, tree_b):
+            if type(tree_a) == Token:
+                return type(tree_b) == Token and tree_a.type == tree_b.type
+            else:
+                return type(tree_b) == Tree and tree_a.data == tree_b.data
+
         # print('crossover @ depth', depth, tree_a, '\n', tree_b)
         if type(tree_a) == Token:
             assert type(tree_b) == Token, tree_b
@@ -414,7 +399,7 @@ class DSL:
             matched = []
             for i in range(len(tree_a.children)):
                 for j in range(len(tree_b.children)):
-                    if self.__match_node(tree_a.children[i], tree_b.children[j]):
+                    if __match_node(tree_a.children[i], tree_b.children[j]):
                         matched.append((i, j))
             if len(matched) > 0:
                 n = random.randrange(len(matched))
@@ -434,15 +419,15 @@ class DSL:
                     name = expr.children[0]
                     is_token = name.children[0].type == 'TOKEN'
                     if '?' in OP:
-                        ji = self.__match(tree_a.children[j], name.children[0], is_token)
-                        ki = self.__match(tree_b.children[k], name.children[0], is_token)
+                        ji = __match(tree_a.children[j], name.children[0], is_token)
+                        ki = __match(tree_b.children[k], name.children[0], is_token)
                         if ji and ki:
                             matched.append((j, k))
                         j += ji
                         k += ki
                     else:
-                        assert self.__match(tree_a.children[j], name.children[0], is_token), (j, tree_a, name, is_token)
-                        assert self.__match(tree_b.children[k], name.children[0], is_token), (k, tree_b, name, is_token)
+                        assert __match(tree_a.children[j], name.children[0], is_token), (j, tree_a, name, is_token)
+                        assert __match(tree_b.children[k], name.children[0], is_token), (k, tree_b, name, is_token)
                         matched.append((j, k))
                         j, k = j + 1, k + 1
                 else:
@@ -450,8 +435,8 @@ class DSL:
                         j, k = j + 1, k + 1
                         continue
                     is_token = expr.children[0].type == 'TOKEN'
-                    assert self.__match(tree_a.children[j], expr.children[0], is_token), (tree_a, expr, is_token)
-                    assert self.__match(tree_b.children[k], expr.children[0], is_token), (tree_b, expr, is_token)
+                    assert __match(tree_a.children[j], expr.children[0], is_token), (tree_a, expr, is_token)
+                    assert __match(tree_b.children[k], expr.children[0], is_token), (tree_b, expr, is_token)
                     matched.append((j, k))
                     j, k = j + 1, k + 1
                 if j >= len(tree_a.children) or k >= len(tree_b.children):
@@ -466,8 +451,8 @@ class DSL:
         else:
             assert subrule.data == 'name', subrule
             is_token = subrule.children[0].type == 'TOKEN'
-            assert self.__match(tree_a.children[0], subrule.children[0], is_token), (tree_a, subrule, is_token)
-            assert self.__match(tree_b.children[0], subrule.children[0], is_token), (tree_b, subrule, is_token)
+            assert __match(tree_a.children[0], subrule.children[0], is_token), (tree_a, subrule, is_token)
+            assert __match(tree_b.children[0], subrule.children[0], is_token), (tree_b, subrule, is_token)
             tree_a.children[0] = self.crossover(tree_a.children[0], tree_b.children[0], depth + 1)
             return tree_a
 
@@ -483,6 +468,7 @@ class DSL:
         swap_a = random.choice(dict_a[chosen_type])
         swap_b = deepcopy(random.choice(dict_b[chosen_type]))
         swap_b.parent, swap_b.index = swap_a.parent, swap_a.index
+        swap_b.update_subtree()
         if swap_a.parent:
             swap_a.parent.children[swap_a.index] = swap_b
             return tree_a

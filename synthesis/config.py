@@ -15,8 +15,8 @@ class Config:
     report = 5
     time_lim = 60
     threshold = 60
-    ratio = True
-    STGP = False
+    ratio = False
+    STGP = True
 
     wt = dict()
     wt['LHS'] = 1
