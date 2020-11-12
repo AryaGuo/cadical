@@ -1,6 +1,7 @@
 class Config:
     meta_file = 'bnf.bnf'
     grammar_file = 'expr.bnf'
+    # grammar_file = 'expr_STGP.bnf'
     pop_size = 20
     depth_lim = 10
     tournament_size = 2
@@ -15,6 +16,7 @@ class Config:
     time_lim = 60
     threshold = 60
     ratio = True
+    STGP = False
 
     wt = dict()
     wt['LHS'] = 1

@@ -70,7 +70,7 @@ def main():
                 if Path.exists(fout):
                     with open(fout) as output:
                         rtime, ans, score = parse_output(args.solver, output, baseline, args.timeout)
-                    writer.writerow({'data_point': data_name, 'verdict': ans, 'time': rtime})
+                    writer.writerow({'data_point': data_name, 'verdict': ans, 'time': rtime, 'score': score})
                     total_count += 1
                     sum_score += score
                     if ans == 'SATISFIABLE':
@@ -82,9 +82,10 @@ def main():
 
     total_solved = sat_count + unsat_count
     avg_time = -1 if total_solved == 0 else time_sum / total_solved
+    avg_score = 1000 if total_count == 0 else sum_score / total_count
     print('{} out of {} solved, {} sat, {} unsat, {} timeout'.format(total_solved, total_count, sat_count, unsat_count,
                                                                      total_count - total_solved))
-    print('Average CPU time: {}. Average score = {}.'.format(avg_time, sum_score / total_count))
+    print('Average CPU time: {}. Average score = {}.'.format(avg_time, avg_score))
 
 
 if __name__ == "__main__":

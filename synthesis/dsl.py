@@ -71,7 +71,7 @@ class Node:
 
     @staticmethod
     def convert_tree(tree, parent, index):
-        if type(tree) == Node:
+        if not Config.STGP or type(tree) == Node:
             return tree
         cur = Node(tree, parent, index)
         if type(tree) == Tree:
@@ -112,13 +112,18 @@ class Scheme:
             logging.info(code)
         logging.info('-----\n')
 
-    def __dsl_to_cpp_(self, tree: Node, term_stabs: dict):
-        if not tree.is_token:
+    def __dsl_to_cpp_(self, tree, term_stabs: dict):
+        def is_token(t):
+            if type(t) == Node:
+                return t.is_token
+            return type(t) == Token
+
+        if not is_token(tree):
             ret = ''
             first = True
             if_body = False
             for c in tree.children:
-                if c.is_token and c.value == 'unbumped' and tree.data == 'assign_unbumped':
+                if is_token(c) and c.value == 'unbumped' and tree.data == 'assign_unbumped':
                     ret += 'for (auto var : vars) {\n\t'
                     first = True
                 if if_body and first:
@@ -127,7 +132,7 @@ class Scheme:
                     ret += ' '
                 first = False
                 ret += self.__dsl_to_cpp_(c, term_stabs)
-                if not c.is_token and c.data == 'condition':
+                if not is_token(c) and c.data == 'condition':
                     if_body = True
                     ret += ' {\n\t'
             if tree.data == 'assign_unbumped':
@@ -135,14 +140,13 @@ class Scheme:
             if if_body:
                 ret += '\n}'
             return ret
-        elif tree.is_token:
+        elif is_token(tree):
             if tree.type in term_stabs:
                 return term_stabs[tree.type]
             else:
                 return tree.value
 
-    def __dsl_to_cpp(self, tree: Node):
-        assert type(tree) == Node, tree
+    def __dsl_to_cpp(self, tree):
         assert tree.data == 'start', tree
 
         tree = tree.children[0]
@@ -202,7 +206,8 @@ class Scheme:
             out = process.stdout.decode().strip()
             logging.info(out)
             out = out.splitlines()
-            solved, rtime, score = int(out[0].split()[0]), float(out[-1].split()[3][:-1]), float(out[-1].split()[-1][:-1])
+            solved, rtime, score = int(out[0].split()[0]), float(out[-1].split()[3][:-1]), float(
+                out[-1].split()[-1][:-1])
             csvfile = output_dir / (basename + '.csv')
             self.display()
             if ratio:
@@ -393,11 +398,6 @@ class DSL:
         # print('crossover @ depth', depth, tree_a, '\n', tree_b)
         if type(tree_a) == Token:
             assert type(tree_b) == Token, tree_b
-            # p_stop = depth / (depth + 3)  # todo depth ~ p
-            # if random.random() < p_stop:
-            #     return tree_b
-            # else:
-            #     return tree_a
             return tree_b
 
         assert type(tree_a) == Tree, tree_a
@@ -410,16 +410,7 @@ class DSL:
 
         rule = self.rule_dict[tree_a.data]
         subrule = rule.children[-1]
-        # print('[subrule]', subrule)
         if subrule.data == 'expansions':
-            # if not self.__match_expansions(tree_a, tree_b):
-            #     return tree_b
-            # matched = []
-            # for i in range(len(tree_a.children)):
-            #     subtree = tree_a.children[i]
-            #     if type(subtree) == Token and subtree.type not in self.token_dict:
-            #         continue
-            #     matched.append((i, i))
             matched = []
             for i in range(len(tree_a.children)):
                 for j in range(len(tree_b.children)):
@@ -438,7 +429,6 @@ class DSL:
             for i in range(len(subrule.children)):
                 expr = subrule.children[i]
                 if expr.data == 'expr':
-                    # print(i, ' expr', expr)
                     OP = expr.children[1]
                     assert OP.type == 'OP', OP
                     name = expr.children[0]
@@ -459,7 +449,6 @@ class DSL:
                     if expr.data != 'name':
                         j, k = j + 1, k + 1
                         continue
-                    # print(i, 'name', expr)
                     is_token = expr.children[0].type == 'TOKEN'
                     assert self.__match(tree_a.children[j], expr.children[0], is_token), (tree_a, expr, is_token)
                     assert self.__match(tree_b.children[k], expr.children[0], is_token), (tree_b, expr, is_token)
@@ -605,14 +594,18 @@ class GP:
 
     def __mutate(self, scheme):
         if random.random() < Config.mutation_rate:
-            # scheme.update(self.dsl.mutate(scheme.tree, 0))
-            scheme.update(self.dsl.mutate_(scheme.tree))
+            if Config.STGP:
+                scheme.update(self.dsl.mutate_(scheme.tree))
+            else:
+                scheme.update(self.dsl.mutate(scheme.tree, 0))
         return scheme.tree
 
     def __crossover(self, scheme_0, scheme_1):
         if random.random() < Config.crossover_rate:
-            # return self.dsl.crossover(scheme_0.tree, scheme_1.tree, 1)
-            return self.dsl.crossover_(scheme_0.tree, scheme_1.tree)
+            if Config.STGP:
+                return self.dsl.crossover_(scheme_0.tree, scheme_1.tree)
+            else:
+                return self.dsl.crossover(scheme_0.tree, scheme_1.tree, 1)
         return scheme_0.tree
 
 
