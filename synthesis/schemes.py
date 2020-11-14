@@ -46,3 +46,18 @@ dsl_36 = """
         bumped = inc / i + i / i / 0.9;
         ninc = i / 8 + inc;
 """
+
+stgp_37 = """
+        if (512 == i)
+            unbumped = i - lhs * i;
+        bumped = i;
+        if (4 == 512)
+            ninc = i;
+"""
+
+stgp_hard_37 = """
+        if (i >= i)
+            unbumped = unbumped * 1024;
+        bumped = lhs + inc;
+        ninc = 64 + 16;
+"""

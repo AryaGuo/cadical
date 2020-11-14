@@ -670,7 +670,7 @@ def monkey():
                       next_generation=functools.partial(next_generation, select_fn=select_fn, build_tree=build_tree_,
                                                         crossover_rate=Config.crossover_rate,
                                                         mutation_rate=Config.mutation_rate))
-    display(winner)
+    display(winner.evaluate())
 
 
 def test_build_tree():
