@@ -1,16 +1,27 @@
 import argparse
 import csv
 import re
+import random
 
+from cycler import cycler
 from pathlib import Path
+from matplotlib.cm import get_cmap
+from matplotlib.lines import Line2D
 
 import matplotlib.pyplot as plt
 
 
 def cactus_plot(args):
-    mks = iter(['x-', 'o-', 's-', 'v-', '<-', '>-', 'P-', 'd-', '.-', '*-', 'D-'])
-    mksc = iter(['x:', 'o:', 's:', 'v:', '<:', '>:', 'P:', 'd:', '.:', '*:', 'D:'])
-
+    colors = list(get_cmap('tab20').colors)
+    colors = colors[:-1:2] + colors[1::2]
+    # random.shuffle(colors)
+    markers = list(Line2D.filled_markers) + ['x', '.', '+']
+    num = min(len(colors), len(markers))
+    # cc = cycler(marker=markers[:num]) + cycler(color=colors[:num])
+    cc = cycler(color=colors)
+    plt.rc('axes', prop_cycle=cc)
+    # mks = iter(['x-', 'o-', 's-', 'v-', '<-', '>-', 'P-', 'd-', '.-', '*-', 'D-'])
+    i_markers = iter([d + '-' for d in markers])
     plt.figure()
     if args.baseline:
         for fin in sorted(Path(args.baseline_dir).rglob('*.csv')):
@@ -31,7 +42,7 @@ def cactus_plot(args):
                     break
                 px.append(i)
                 py.append(j)
-            plt.plot(px, py, mks.__next__(), label=name, alpha=0.5, markersize=5)
+            plt.plot(px, py, label=name, alpha=0.8, markersize=5)
 
     regex = re.compile(args.re)
     for fin in sorted(Path(args.input_dir).rglob('*.csv')):
@@ -54,7 +65,7 @@ def cactus_plot(args):
                 break
             px.append(i)
             py.append(j)
-        plt.plot(px, py, label=name if args.label else None, alpha=0.8, markersize=5)
+        plt.plot(px, py, i_markers.__next__(), label=name if args.label else None, alpha=0.8, markersize=5)
 
     plt.xlim(0)
     plt.ylim(0, args.time_lim)

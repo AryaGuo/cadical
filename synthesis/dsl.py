@@ -51,22 +51,22 @@ class Node:
             for c in self.children:
                 c.update_subtree()
 
-    def build_type_dict(self, d: dict, token_dict, banned):
+    def build_type_dict(self, d: dict, condition):
         if self.is_token:
-            if self.type in token_dict and self.type not in banned:
+            if condition(self.type):
                 d[self.type].append(self)
             return
         d[self.data].append(self)
         for c in self.children:
-            c.build_type_dict(d, token_dict, banned)
+            c.build_type_dict(d, condition)
 
-    def subtree(self, token_dict, banned):
+    def subtree(self, condition):
         if self.is_token:
-            ret = [self] if self.type in token_dict and self.type not in banned else []
+            ret = [self] if condition(self.type) else []
             return ret
         ret = [self] if self.data != 'start' else []
         for c in self.children:
-            ret += c.subtree(token_dict, banned)
+            ret += c.subtree(condition)
         return ret
 
     @staticmethod
@@ -94,9 +94,7 @@ class Scheme:
     Can be described by dsl(str), a parse tree(Node) or a c++ code snippet.
     """
 
-    def __init__(self, rule_dict, token_dict, dsl, tree, name=None):
-        self.rule_dict = rule_dict
-        self.token_dict = token_dict
+    def __init__(self, dsl, tree, name=None):
         self.dsl = dsl
         self.tree = Node.convert_tree(tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
@@ -231,80 +229,45 @@ class DSL:
             self.parser = Lark(grammar)
         with open(grammar_file) as grammar:
             self.grammar_tree = meta_parser.parse(grammar.read())
-            self.rule_dict, self.token_dict, self.single_terminals = self.__init_dicts(self.grammar_tree)
+            self.single_terminals, self.rule_dict, self.token_dict = self.__init_dicts(self.grammar_tree)
+        self.grow_type_table, self.full_type_table = self.__build_type_table()
+
+    def variable_token(self, token_type):
+        return token_type in self.token_dict and token_type not in self.single_terminals
 
     def gen_random_scheme(self, rule, depth):
-        return self.get_scheme_from_dsl(self.__gen_random_dsl(self.rule_dict[rule], depth))
-
-    def get_scheme_from_tree(self, tree):
-        scheme = Scheme(self.rule_dict, self.token_dict, None, tree, None)
-        return scheme
+        return self.get_scheme_from_dsl(self.__gen_random_dsl(rule, depth))
 
     def get_scheme_from_dsl(self, dsl, name=None):
-        scheme = Scheme(self.rule_dict, self.token_dict, dsl, self.parser.parse(dsl), name)
+        scheme = Scheme(dsl, self.parser.parse(dsl), name)
         return scheme
 
-    def __gen_random_dsl(self, parse_tree, depth: int):
+    def __gen_random_dsl(self, name: str, depth: int, strategy: str = 'grow'):
         """
-        Generate a random instance from the specified grammar rule.
-        :param parse_tree: Grammar rule in lark.Tree or lark.Token format.
-        :param depth: Recursive depth limits for subtrees.
-        :return: A random string satisfying the grammar rule.
+        :param name: Name of the generated rule.
+        :param depth: Current depth limit.
+        :param strategy: 'grow' or 'full'
+        :return: DSL in string.
         """
-        # print('[gen_random @ {}]'.format(depth), parse_tree)
-
         if depth < 0:
             return None
-
-        if type(parse_tree) == Token:
-            if parse_tree.type == 'TOKEN':
-                return self.__gen_random_dsl(self.token_dict[parse_tree], depth)
-            elif parse_tree.type == 'STRING':
-                return parse_tree.strip('"')
-            elif parse_tree.type == 'RULE':
-                return self.__gen_random_dsl(self.rule_dict[parse_tree], depth)
-            else:
-                return parse_tree
-
-        assert type(parse_tree) == Tree, parse_tree
-
-        sample = ''
-
-        if parse_tree.data == 'rule' or parse_tree.data == 'token':
-            return self.__gen_random_dsl(parse_tree.children[-1], depth)
-        elif parse_tree.data == 'expansion':
-            for c in parse_tree.children:
-                substr = self.__gen_random_dsl(c, depth - 1)
-                if substr is None:
-                    return None
-                sample += substr
-            return sample
-        elif parse_tree.data == 'expansions':
-            expansions = parse_tree.children
-            wt_lst = []
-            for c in expansions:
-                cur = 1
-                for token in c.children:
-                    if type(token) == Token and token in Config.wt:
-                        cur += Config.wt[token]
-                wt_lst.append(cur)
-            for i in range(Config.gen_restart):
-                n = random.choices(range(len(expansions)), weights=wt_lst)[0]
-                substr = self.__gen_random_dsl(expansions[n], depth - 1)
-                if substr is not None:
-                    return substr
+        ret = ''
+        type_table = self.full_type_table if strategy == 'full' else self.grow_type_table
+        allowed_rules = type_table[depth][name]
+        if len(allowed_rules) == 0:
             return None
-        elif parse_tree.data == 'expr':
-            OP = parse_tree.children[-1]
-            assert OP.type == 'OP', OP
-            if '?' in OP:
-                coin = random.random()
-                if coin < Config.OP_prob:
-                    return self.__gen_random_dsl(parse_tree.children[0], depth - 1)
+        rule = random.choices(allowed_rules, [rule.get_weight() for rule in allowed_rules])[0]
+        for entry in rule.prod:
+            if not entry.is_name:
+                ret += entry.name
+            else:
+                if entry.op and (entry.name not in type_table[depth - 1] or random.random() > Config.OP_prob):
+                    continue
+                if entry.name not in self.rule_dict and entry.name not in self.token_dict:
+                    ret += entry.name
                 else:
-                    return ''
-        else:
-            return self.__gen_random_dsl(parse_tree.children[0], depth)
+                    ret += self.__gen_random_dsl(entry.name, depth - 1, strategy)
+        return ret
 
     def __gen_random_tree(self, rule, depth, is_token=False):
         dsl_str = self.__gen_random_dsl(rule, depth)
@@ -314,39 +277,35 @@ class DSL:
         with open(self.grammar_file) as grammar:
             parser = Lark(grammar)
             if is_token:
-                ret = parser.parse(dsl_str).children[0]
+                return parser.parse(dsl_str).children[0]
             else:
-                name = rule.children[0].lstrip('!?')
-                ret = parser.parse(dsl_str, name)
-            return ret
+                return parser.parse(dsl_str, rule)
 
     def mutate(self, parse_tree, depth):
         if type(parse_tree) == Token:
-            if parse_tree.type in self.token_dict and self.token_dict[parse_tree.type].data != 'literal':
-                return self.__gen_random_tree(self.token_dict[parse_tree.type], Config.depth_lim, True)
+            if self.variable_token(parse_tree.type):
+                return self.__gen_random_tree(parse_tree.type, Config.depth_lim - 1, True)
             else:
                 return parse_tree
 
         assert type(parse_tree) == Tree, parse_tree
 
-        p_stop = depth / (depth + 5)  # todo: prob to mutate current node
+        p_stop = depth / (depth + 8)
         if random.random() < p_stop and parse_tree.data != 'start':
-            return self.__gen_random_tree(self.rule_dict[parse_tree.data.lstrip('?!')], Config.depth_lim)
+            return self.__gen_random_tree(parse_tree.data, Config.depth_lim - 1)
 
         rand_child_index = random.randrange(len(parse_tree.children))
         parse_tree.children[rand_child_index] = self.mutate(parse_tree.children[rand_child_index], depth + 1)
         return parse_tree
 
     def mutate_(self, tree):
-        nodes = tree.subtree(self.token_dict, self.single_terminals)
+        nodes = tree.subtree(self.variable_token)
         for _ in range(Config.gen_restart):
             rand_node = random.choice(nodes)
             if rand_node.is_token:
-                other = self.__gen_random_tree(self.token_dict[rand_node.type], Config.depth_lim - rand_node.depth,
-                                               True)
+                other = self.__gen_random_tree(rand_node.type, Config.depth_lim - rand_node.depth, True)
             else:
-                other = self.__gen_random_tree(self.rule_dict[rand_node.data.lstrip('?!')],
-                                               Config.depth_lim - rand_node.depth)
+                other = self.__gen_random_tree(rand_node.data, Config.depth_lim - rand_node.depth)
             if other is not None:
                 other = Node.convert_tree(other, rand_node.parent, rand_node.index)
                 break
@@ -368,19 +327,13 @@ class DSL:
         :return: Tree_a' with new branch.
         """
 
-        def __match(tree, rule, is_token):
-            if is_token:
-                return type(tree) == Token and tree.type == rule
-            else:
-                return type(tree) == Tree and tree.data == rule
-
         def __match_node(tree_a, tree_b):
             if type(tree_a) == Token:
-                return type(tree_b) == Token and tree_a.type == tree_b.type
+                return type(tree_b) == Token and tree_a.type == tree_b.type and self.variable_token(tree_a.type)
             else:
                 return type(tree_b) == Tree and tree_a.data == tree_b.data
 
-        # print('crossover @ depth', depth, tree_a, '\n', tree_b)
+        # print('crossover @ depth', depth, tree_a.data if type(tree_a) == Tree else tree_a)
         if type(tree_a) == Token:
             assert type(tree_b) == Token, tree_b
             return tree_b
@@ -389,78 +342,28 @@ class DSL:
         assert type(tree_b) == Tree, tree_b
         assert tree_a.data == tree_b.data, (tree_a, tree_b)
 
-        p_stop = depth / (depth + 3)  # todo depth ~ p
+        p_stop = depth / (depth + 8)
         if random.random() < p_stop and tree_a.data != 'start':
             return tree_b
 
-        rule = self.rule_dict[tree_a.data]
-        subrule = rule.children[-1]
-        if subrule.data == 'expansions':
-            matched = []
-            for i in range(len(tree_a.children)):
-                for j in range(len(tree_b.children)):
-                    if __match_node(tree_a.children[i], tree_b.children[j]):
-                        matched.append((i, j))
-            if len(matched) > 0:
-                n = random.randrange(len(matched))
-                tree_a.children[matched[n][0]] = self.crossover(tree_a.children[matched[n][0]],
-                                                                tree_b.children[matched[n][1]], depth + 1)
-                return tree_a
-            else:
-                return tree_b
-        elif subrule.data == 'expansion':
-            j, k = 0, 0  # tree_a, tree_b
-            matched = []
-            for i in range(len(subrule.children)):
-                expr = subrule.children[i]
-                if expr.data == 'expr':
-                    OP = expr.children[1]
-                    assert OP.type == 'OP', OP
-                    name = expr.children[0]
-                    is_token = name.children[0].type == 'TOKEN'
-                    if '?' in OP:
-                        ji = __match(tree_a.children[j], name.children[0], is_token)
-                        ki = __match(tree_b.children[k], name.children[0], is_token)
-                        if ji and ki:
-                            matched.append((j, k))
-                        j += ji
-                        k += ki
-                    else:
-                        assert __match(tree_a.children[j], name.children[0], is_token), (j, tree_a, name, is_token)
-                        assert __match(tree_b.children[k], name.children[0], is_token), (k, tree_b, name, is_token)
-                        matched.append((j, k))
-                        j, k = j + 1, k + 1
-                else:
-                    if expr.data != 'name':
-                        j, k = j + 1, k + 1
-                        continue
-                    is_token = expr.children[0].type == 'TOKEN'
-                    assert __match(tree_a.children[j], expr.children[0], is_token), (tree_a, expr, is_token)
-                    assert __match(tree_b.children[k], expr.children[0], is_token), (tree_b, expr, is_token)
-                    matched.append((j, k))
-                    j, k = j + 1, k + 1
-                if j >= len(tree_a.children) or k >= len(tree_b.children):
-                    break
-            if len(matched) > 0:
-                n = random.randrange(len(matched))
-                tree_a.children[matched[n][0]] = self.crossover(tree_a.children[matched[n][0]],
-                                                                tree_b.children[matched[n][1]], depth + 1)
-                return tree_a
-            else:
-                return tree_b
-        else:
-            assert subrule.data == 'name', subrule
-            is_token = subrule.children[0].type == 'TOKEN'
-            assert __match(tree_a.children[0], subrule.children[0], is_token), (tree_a, subrule, is_token)
-            assert __match(tree_b.children[0], subrule.children[0], is_token), (tree_b, subrule, is_token)
-            tree_a.children[0] = self.crossover(tree_a.children[0], tree_b.children[0], depth + 1)
+        matched = []
+        for i in range(len(tree_a.children)):
+            for j in range(len(tree_b.children)):
+                if __match_node(tree_a.children[i], tree_b.children[j]):
+                    matched.append((i, j))
+        if len(matched) > 0:
+            n = random.randrange(len(matched))
+            tree_a.children[matched[n][0]] = self.crossover(tree_a.children[matched[n][0]],
+                                                            tree_b.children[matched[n][1]], depth + 1)
             return tree_a
+        else:
+            return tree_b
 
     def crossover_(self, tree_a, tree_b):
         dict_a = collections.defaultdict(list)
         dict_b = collections.defaultdict(list)
-        tree_a.build_type_dict(dict_a, self.token_dict, self.single_terminals)
-        tree_b.build_type_dict(dict_b, self.token_dict, self.single_terminals)
+        tree_a.build_type_dict(dict_a, self.variable_token)
+        tree_b.build_type_dict(dict_b, self.variable_token)
         mutual_types = list(frozenset(dict_a) & frozenset(dict_b))
         if not mutual_types:
             raise Exception('No mutual types')
@@ -476,21 +379,93 @@ class DSL:
             return swap_b
 
     @staticmethod
+    def parse_rule(tree: Tree):
+        ret = []
+        assert tree.data == 'rule' or tree.data == 'token', tree.data
+        expansions = tree.children[-1]
+        if expansions.data == 'expansions':
+            expansion_list = expansions.children
+        else:
+            expansion_list = [expansions]
+        for expansion in expansion_list:
+            rule = Rule(tree.children[0].lstrip('?!'), tree.data == 'token')
+            if expansion.data == 'expansion':
+                exprs = expansion.children
+            else:
+                exprs = [expansion]
+            for expr in exprs:
+                if expr.data == 'expr':
+                    value, op = expr.children[0], expr.children[-1]
+                else:
+                    value, op = expr, None
+                if value.data == 'name':
+                    rule.prod.append(Rule_entry(value.children[0], op, True))
+                else:
+                    rule.prod.append(Rule_entry(value.children[0].strip('"'), op, False))
+            ret.append(rule)
+        return ret
+
+    @staticmethod
     def __init_dicts(tree):
-        rule_dict = dict()
-        token_dict = dict()
         single_terminals = set()
+        rule_dict = collections.defaultdict(list)
+        token_dict = collections.defaultdict(list)
 
         for rule in tree.children:
             if rule.data == 'rule':
                 key = rule.children[0].lstrip('?!')
-                rule_dict[key] = rule
+                rule_dict[key] = DSL.parse_rule(rule)
             elif rule.data == 'token':
                 key = rule.children[0]
-                token_dict[key] = rule.children[-1]
+                token_dict[key] = DSL.parse_rule(rule)
                 if rule.children[-1].data == 'literal':
                     single_terminals.add(key)
-        return rule_dict, token_dict, single_terminals
+        return single_terminals, rule_dict, token_dict
+
+    def __build_type_table(self):
+        # key: name; value: Rule
+        grow_type_table = [collections.defaultdict(list) for _ in range(Config.depth_lim)]
+        full_type_table = [collections.defaultdict(list) for _ in range(Config.depth_lim)]
+        for token in self.token_dict.keys():
+            for rule in self.token_dict[token]:
+                grow_type_table[0][token].append(rule)
+                full_type_table[0][token].append(rule)
+        for i in range(1, Config.depth_lim):
+            for k in grow_type_table[i - 1].keys():
+                grow_type_table[i][k].extend(grow_type_table[i - 1][k])
+            for name in self.rule_dict.keys():
+                for rule in self.rule_dict[name]:
+                    grow_check = [
+                        not rule.prod[j].is_name or rule.prod[j].op or rule.prod[j].name in grow_type_table[i - 1]
+                        for j in range(len(rule.prod))]
+                    full_check = [
+                        not rule.prod[j].is_name or rule.prod[j].op or rule.prod[j].name in full_type_table[i - 1]
+                        for j in range(len(rule.prod))]
+                    if all(grow_check):
+                        grow_type_table[i][name].append(rule)
+                    if all(full_check):
+                        full_type_table[i][name].append(rule)
+        return grow_type_table, full_type_table
+
+
+Rule_entry = collections.namedtuple('Rule_entry', ['name', 'op', 'is_name'])
+
+
+class Rule:
+    def __init__(self, name, is_token):
+        self.name = name
+        self.is_token = is_token
+        self.prod = []  # [name, OP, is_name]
+
+    def get_weight(self):
+        sum = 1
+        for entry in self.prod:
+            if entry.name in Config.wt:
+                sum += Config.wt[entry.name]
+        return sum
+
+    def __repr__(self):
+        return '{}[{}]'.format(self.name, self.prod)
 
 
 class GP:
@@ -502,7 +477,7 @@ class GP:
         self.generation = 0
         self.pop_size = cfg.pop_size
         self.elitism = cfg.elitism
-        self.depth_lim = cfg.depth_lim
+        self.depth_lim = cfg.depth_lim - 1
         self.tournament_size = cfg.tournament_size
         if self.tournament_size > self.pop_size:
             raise Exception('tournament_size larger than pop_size')
@@ -551,7 +526,7 @@ class GP:
 
         for i in range(start_index, self.pop_size):
             parent_0, parent_1 = self.__tournament_selection()
-            new_population.append(self.dsl.get_scheme_from_tree(self.__crossover(parent_0, parent_1)))
+            new_population.append(Scheme(None, self.__crossover(parent_0, parent_1), None))
             self.__mutate(new_population[-1])
 
         self.population = new_population

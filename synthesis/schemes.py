@@ -57,7 +57,19 @@ stgp_37 = """
 
 stgp_hard_37 = """
         if (i >= i)
-            unbumped = unbumped * 1024;
+            unbumped = lhs * 1024;
         bumped = lhs + inc;
         ninc = 64 + 16;
+"""
+
+monkeys = """
+        unbumped = (lhs + 2) * ((0.4 / 2) / 9);
+        bumped = 0.9;
+        ninc = inc;
+"""
+
+ratio = """
+        bumped = 32 - i + inc / 64 * inc;
+        if ( i >= 5 )
+            ninc = lhs + 0 - 0.3 ;
 """
