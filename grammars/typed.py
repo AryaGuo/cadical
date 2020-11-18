@@ -189,7 +189,7 @@ new_score = {};
 @priority(weight['special'])
 def assign_score_inc(rhs):
     return """double lhs = score_inc;
-score_inc = {};""".format(rhs)
+new_score_inc = {};""".format(rhs)
 
 
 @params('assign_unbumped', 'assign_new_score', 'assign_score_inc')

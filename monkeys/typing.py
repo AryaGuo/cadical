@@ -152,7 +152,7 @@ def __type_annotations_factory():
 
         return decorator
 
-    def constant(return_type, value, weight):
+    def constant(return_type, value, weight=1):
         """Register a constant value under the given type."""
 
         @params()

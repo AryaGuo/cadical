@@ -1,6 +1,7 @@
 import argparse
 import collections
 import functools
+import importlib
 import logging
 import random
 import shutil
@@ -15,13 +16,11 @@ from lark import Lark, Tree, Token
 curPath = Path(__file__).resolve()
 sys.path.append(str(curPath.parents[1]))
 
-from synthesis.config import Config
+from synthesis.config import cfg
 
 from monkeys import optimize, tournament_select, next_generation, build_tree
 from monkeys.typing import params
 from monkeys.search import require, pre_evaluate
-from monkey.grammar import selection_strategy
-from monkey import grammar
 
 
 class Node:
@@ -71,7 +70,7 @@ class Node:
 
     @staticmethod
     def convert_tree(tree, parent, index):
-        if not Config.STGP or type(tree) == Node:
+        if not cfg.STGP or type(tree) == Node:
             return tree
         cur = Node(tree, parent, index)
         if type(tree) == Tree:
@@ -98,7 +97,7 @@ class Scheme:
         self.dsl = dsl
         self.tree = Node.convert_tree(tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(Config.ratio)
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(cfg.ratio)
         if name is not None and self.file is not None:
             dst = self.file.parent / (name + '.csv')
             shutil.move(self.file, dst)
@@ -170,6 +169,8 @@ class Scheme:
         with open('analyze_blank.cpp', 'r') as cpp_file:
             code = cpp_file.readlines()
         for j in range(3):
+            if codes[j] is None:
+                continue
             code_snippet = codes[j].splitlines()
             for i in range(len(code_snippet)):
                 code_snippet[i] = '\t\t' + code_snippet[i]
@@ -194,12 +195,12 @@ class Scheme:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
-            subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
+            subprocess.run('cd .. ; sh python/cadical.sh ' + str(cfg.time_lim), shell=True, check=True,
                            capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()
-            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(Config.time_lim),
+            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(cfg.time_lim),
                                      shell=True, check=True, capture_output=True)
             out = process.stdout.decode().strip()
             logging.info(out)
@@ -219,7 +220,7 @@ class Scheme:
     def update(self, new_tree):
         self.tree = Node.convert_tree(new_tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(Config.ratio)
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(cfg.ratio)
 
 
 class DSL:
@@ -261,7 +262,7 @@ class DSL:
             if not entry.is_name:
                 ret += entry.name
             else:
-                if entry.op and (entry.name not in type_table[depth - 1] or random.random() > Config.OP_prob):
+                if entry.op and (entry.name not in type_table[depth - 1] or random.random() > cfg.OP_prob):
                     continue
                 if entry.name not in self.rule_dict and entry.name not in self.token_dict:
                     ret += entry.name
@@ -284,7 +285,7 @@ class DSL:
     def mutate(self, parse_tree, depth):
         if type(parse_tree) == Token:
             if self.variable_token(parse_tree.type):
-                return self.__gen_random_tree(parse_tree.type, Config.depth_lim - 1, True)
+                return self.__gen_random_tree(parse_tree.type, cfg.depth_lim - 1, True)
             else:
                 return parse_tree
 
@@ -292,7 +293,7 @@ class DSL:
 
         p_stop = depth / (depth + 8)
         if random.random() < p_stop and parse_tree.data != 'start':
-            return self.__gen_random_tree(parse_tree.data, Config.depth_lim - 1)
+            return self.__gen_random_tree(parse_tree.data, cfg.depth_lim - 1)
 
         rand_child_index = random.randrange(len(parse_tree.children))
         parse_tree.children[rand_child_index] = self.mutate(parse_tree.children[rand_child_index], depth + 1)
@@ -300,12 +301,12 @@ class DSL:
 
     def mutate_(self, tree):
         nodes = tree.subtree(self.variable_token)
-        for _ in range(Config.gen_restart):
+        for _ in range(cfg.gen_restart):
             rand_node = random.choice(nodes)
             if rand_node.is_token:
-                other = self.__gen_random_tree(rand_node.type, Config.depth_lim - rand_node.depth, True)
+                other = self.__gen_random_tree(rand_node.type, cfg.depth_lim - rand_node.depth, True)
             else:
-                other = self.__gen_random_tree(rand_node.data, Config.depth_lim - rand_node.depth)
+                other = self.__gen_random_tree(rand_node.data, cfg.depth_lim - rand_node.depth)
             if other is not None:
                 other = Node.convert_tree(other, rand_node.parent, rand_node.index)
                 break
@@ -424,13 +425,13 @@ class DSL:
 
     def __build_type_table(self):
         # key: name; value: Rule
-        grow_type_table = [collections.defaultdict(list) for _ in range(Config.depth_lim)]
-        full_type_table = [collections.defaultdict(list) for _ in range(Config.depth_lim)]
+        grow_type_table = [collections.defaultdict(list) for _ in range(cfg.depth_lim)]
+        full_type_table = [collections.defaultdict(list) for _ in range(cfg.depth_lim)]
         for token in self.token_dict.keys():
             for rule in self.token_dict[token]:
                 grow_type_table[0][token].append(rule)
                 full_type_table[0][token].append(rule)
-        for i in range(1, Config.depth_lim):
+        for i in range(1, cfg.depth_lim):
             for k in grow_type_table[i - 1].keys():
                 grow_type_table[i][k].extend(grow_type_table[i - 1][k])
             for name in self.rule_dict.keys():
@@ -460,8 +461,8 @@ class Rule:
     def get_weight(self):
         sum = 1
         for entry in self.prod:
-            if entry.name in Config.wt:
-                sum += Config.wt[entry.name]
+            if entry.name in cfg.wt:
+                sum += cfg.wt[entry.name]
         return sum
 
     def __repr__(self):
@@ -469,7 +470,7 @@ class Rule:
 
 
 class GP:
-    def __init__(self, cfg):
+    def __init__(self):
         with open(cfg.meta_file) as meta_grammar:
             meta_parser = Lark(meta_grammar)
         self.dsl = DSL(meta_parser, cfg.grammar_file)
@@ -482,7 +483,7 @@ class GP:
         if self.tournament_size > self.pop_size:
             raise Exception('tournament_size larger than pop_size')
 
-    def init_population(self, scheme_list=None, eval_mode=False):  # todo: depth ~ distribution / depth range
+    def init_population(self, scheme_list=None, eval_mode=False):
         assert self.generation == 0, self.generation
         self.generation = 1
 
@@ -554,16 +555,16 @@ class GP:
         return deepcopy(temp_tournament[0]), deepcopy(temp_tournament[1])
 
     def __mutate(self, scheme):
-        if random.random() < Config.mutation_rate:
-            if Config.STGP:
+        if random.random() < cfg.mutation_rate:
+            if cfg.STGP:
                 scheme.update(self.dsl.mutate_(scheme.tree))
             else:
                 scheme.update(self.dsl.mutate(scheme.tree, 0))
         return scheme.tree
 
     def __crossover(self, scheme_0, scheme_1):
-        if random.random() < Config.crossover_rate:
-            if Config.STGP:
+        if random.random() < cfg.crossover_rate:
+            if cfg.STGP:
                 return self.dsl.crossover_(scheme_0.tree, scheme_1.tree)
             else:
                 return self.dsl.crossover(scheme_0.tree, scheme_1.tree, 1)
@@ -571,14 +572,14 @@ class GP:
 
 
 def run_gp():
-    gp = GP(Config)
+    gp = GP()
     logging.info('--- Initializing population ---')
-    gp.init_population(scheme_list=args.load)
-    for i in range(Config.epoch):
+    gp.init_population(scheme_list=cfg.load)
+    for i in range(cfg.epoch):
         logging.info('--- Epoch {} starts ---'.format(i))
-        gp.report(Config.report)
+        gp.report(cfg.report)
         gp.evolve()
-        if i % Config.save == 0:
+        if i % cfg.save == 0:
             gp.save('epoch_{}'.format(i))
 
     winner = gp.get_winner()
@@ -589,16 +590,16 @@ def run_gp():
 
 
 def get_seed():
-    if Config.seed is not None:
-        return Config.seed
+    if cfg.seed is not None:
+        return cfg.seed
     else:
         return random.randrange(sys.maxsize)
 
 
 def main():
-    if args.eval is not None:
-        schemes = args.eval
-        gp = GP(Config)
+    if cfg.eval is not None:
+        schemes = cfg.eval
+        gp = GP()
         gp.init_population(schemes, True)
         gp.report(len(schemes))
         return
@@ -610,7 +611,9 @@ def main():
         raise err
 
 
-def monkey():
+def monkeys():
+    grammar = importlib.import_module(cfg.monkeys)
+
     def display(codes):
         logging.info('-----')
         for code in codes:
@@ -625,9 +628,9 @@ def monkey():
             Scheme.embed_cadical(heuristic)
             if not Scheme.compile_cadical():
                 return -sys.maxsize
-            subprocess.run('cd .. ; sh python/cadical.sh ' + str(Config.time_lim), shell=True, check=True,
+            subprocess.run('cd .. ; sh python/cadical.sh ' + str(cfg.time_lim), shell=True, check=True,
                            capture_output=True)
-            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(Config.time_lim),
+            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(cfg.time_lim),
                                      shell=True, check=True, capture_output=True)
             out = process.stdout.decode().strip()
             logging.info(out)
@@ -639,18 +642,18 @@ def monkey():
             logging.error(err)
             return -sys.maxsize
 
-    build_tree_ = functools.partial(build_tree, selection_strategy=selection_strategy)
-    select_fn = functools.partial(tournament_select, selection_size=Config.tournament_size)
-    winner = optimize(score, iterations=Config.epoch, population_size=Config.pop_size,
+    build_tree_ = functools.partial(build_tree, selection_strategy=grammar.selection_strategy)
+    select_fn = functools.partial(tournament_select, selection_size=cfg.tournament_size)
+    winner = optimize(score, iterations=cfg.epoch, population_size=cfg.pop_size,
                       next_generation=functools.partial(next_generation, select_fn=select_fn, build_tree=build_tree_,
-                                                        crossover_rate=Config.crossover_rate,
-                                                        mutation_rate=Config.mutation_rate))
+                                                        crossover_rate=cfg.crossover_rate,
+                                                        mutation_rate=cfg.mutation_rate))
     display(winner.evaluate())
 
 
-def test_build_tree():
+def test_build_tree(grammar):
     tp = 'heuristic'
-    node = build_tree(tp, selection_strategy=selection_strategy)
+    node = build_tree(tp, selection_strategy=grammar.selection_strategy)
     codes = node.evaluate()
     if tp == 'heuristic':
         for code in codes:
@@ -661,23 +664,43 @@ def test_build_tree():
 
 def init_dataset():
     logging.info('\nFiltering datasets for evaluation...')
-    filtering = subprocess.run('cd ..; python python/filter.py -T ' + str(Config.threshold), shell=True, check=True,
+    filtering = subprocess.run('cd ..; python python/filter.py -T ' + str(cfg.threshold), shell=True, check=True,
                                capture_output=True)
     out = filtering.stdout.decode().strip()
     logging.info(out + ' problems in total\n')
 
 
-if __name__ == '__main__':
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-O', '--output_root', required=True, type=str)
+    parser.add_argument('-O', '--output_root', type=str)
+    parser.add_argument('-S', '--pop_size', type=int)
+    parser.add_argument('-D', '--depth_lim', type=int)
+    parser.add_argument('-T', '--tournament_size', type=int)
+    parser.add_argument('-e', '--epoch', type=int)
+
+    parser.add_argument('-t', '--time_lim', type=int)
+    parser.add_argument('-F', '--threshold', type=int)
     parser.add_argument('-E', '--eval', nargs='+', default=None, help='Evaluation mode: run eval for given schemes.')
+
+    parser.add_argument('-R', '--ratio', type=bool)
+    parser.add_argument('-s', '--STGP', type=bool)
+    parser.add_argument('-M', '--monkeys', type=str)
     parser.add_argument('-L', '--load', nargs='+', default=None, help='Initialize from given schemes.')
-    parser.add_argument('-M', '--monkey', action='store_true')
     args = parser.parse_args()
 
+    for k, v in vars(args).items():
+        if v is not None:
+            cfg.__setattr__(k, v)
+
+
+if __name__ == '__main__':
+    parse_args()
+    monkeys()
+    exit()
+
     cur_time = time.strftime('%m%d-%H%M%S')
-    output_dir = Path(args.output_root) / cur_time
-    Path.mkdir(Path(args.output_root), exist_ok=True)
+    output_dir = Path(cfg.output_root) / cur_time
+    Path.mkdir(Path(cfg.output_root), exist_ok=True)
     Path.mkdir(output_dir, exist_ok=True)
 
     logging.basicConfig(format='%(levelname)s: %(message)s', filename=str(output_dir / 'log.txt'), level=logging.INFO)
@@ -685,8 +708,8 @@ if __name__ == '__main__':
     stdoutLogger.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(stdoutLogger)
 
-    temp = vars(Config)
-    cfg_str = ' --- Config ---\n'
+    temp = vars(cfg)
+    cfg_str = ' --- cfg ---\n'
     for item in temp:
         cfg_str += '\t' + item + ' = ' + str(temp[item]) + '\n'
     cfg_str += '--- End of config ---\n'
@@ -694,10 +717,9 @@ if __name__ == '__main__':
     seed = get_seed()
     random.seed(seed)
     logging.info('Random seed: {}'.format(seed))
-    logging.info(args)
 
     init_dataset()
-    if args.monkey:
-        monkey()
+    if cfg.monkeys:
+        monkeys()
     else:
         main()
