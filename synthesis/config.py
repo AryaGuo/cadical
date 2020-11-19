@@ -26,7 +26,7 @@ class Config:
         self.eval = None
 
         # method
-        self.ratio = False
+        self.score = 'par-2'
         self.STGP = True
         self.monkeys = None  # 'grammars.typed'
         self.load = None

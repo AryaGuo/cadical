@@ -97,7 +97,7 @@ class Scheme:
         self.dsl = dsl
         self.tree = Node.convert_tree(tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(cfg.ratio)
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness()
         if name is not None and self.file is not None:
             dst = self.file.parent / (name + '.csv')
             shutil.move(self.file, dst)
@@ -189,8 +189,14 @@ class Scheme:
             return False
         return True
 
-    def __eval_fitness(self, ratio=True):
-        # return 40, 1.0, 100, None
+    def __eval_fitness(self):
+        def score(scheme):
+            if scheme == 'par-2':
+                return -(rtime * solved + (cnt - solved) * 2 * cfg.time_lim) / cnt
+            if scheme == 'ratio':
+                return -ratio
+            return 30 * solved ** 2 + 60 / rtime
+
         try:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
@@ -205,14 +211,13 @@ class Scheme:
             out = process.stdout.decode().strip()
             logging.info(out)
             out = out.splitlines()
-            solved, rtime, score = int(out[0].split()[0]), float(out[-1].split()[3][:-1]), float(
-                out[-1].split()[-1][:-1])
+            solved, cnt, rtime, ratio = int(out[0].split()[0]), int(out[0].split()[3]), float(
+                out[-1].split()[3][:-1]), float(out[-1].split()[-1][:-1])
             csvfile = output_dir / (basename + '.csv')
+            fitness = score(cfg.score)
+            logging.info('Fitness = {}'.format(fitness))
             self.display()
-            if ratio:
-                return solved, rtime, -score, csvfile
-            else:
-                return solved, rtime, 30 * solved ** 2 + 60 / rtime, csvfile
+            return solved, rtime, fitness, csvfile
         except subprocess.CalledProcessError as err:
             logging.error(err)
             return 0, 0, -sys.maxsize, None
@@ -220,7 +225,7 @@ class Scheme:
     def update(self, new_tree):
         self.tree = Node.convert_tree(new_tree, None, None)
         self.code = self.__dsl_to_cpp(self.tree)
-        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness(cfg.ratio)
+        self.solved, self.rtime, self.fitness, self.file = self.__eval_fitness()
 
 
 class DSL:
@@ -684,7 +689,7 @@ def parse_args():
     parser.add_argument('-F', '--threshold', type=int)
     parser.add_argument('-E', '--eval', nargs='+', default=None, help='Evaluation mode: run eval for given schemes.')
 
-    parser.add_argument('-R', '--ratio', type=bool)
+    parser.add_argument('-R', '--score', type=str)
     parser.add_argument('-s', '--STGP', type=bool)
     parser.add_argument('-M', '--monkeys', type=str)
     parser.add_argument('-L', '--load', nargs='+', default=None, help='Initialize from given schemes.')
@@ -708,10 +713,9 @@ if __name__ == '__main__':
     stdoutLogger.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(stdoutLogger)
 
-    temp = vars(cfg)
-    cfg_str = ' --- cfg ---\n'
-    for item in temp:
-        cfg_str += '\t' + item + ' = ' + str(temp[item]) + '\n'
+    cfg_str = ' --- config ---\n'
+    for k, v in vars(cfg).items():
+        cfg_str += '\t' + k + ' = ' + str(v) + '\n'
     cfg_str += '--- End of config ---\n'
     logging.info(cfg_str)
     seed = get_seed()
