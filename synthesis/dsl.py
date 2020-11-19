@@ -586,6 +586,8 @@ def run_gp():
     shutil.copy(winner.file, output_dir / 'winner.csv')
     logging.info('Winner: {}'.format(winner.file))
     winner.display()
+    Scheme.embed_cadical(winner.code)
+    Scheme.compile_cadical()
     logging.info('{} solved, avg_time = {}, fitness = {}'.format(winner.solved, winner.rtime, winner.fitness))
 
 
@@ -695,8 +697,6 @@ def parse_args():
 
 if __name__ == '__main__':
     parse_args()
-    monkeys()
-    exit()
 
     cur_time = time.strftime('%m%d-%H%M%S')
     output_dir = Path(cfg.output_root) / cur_time
