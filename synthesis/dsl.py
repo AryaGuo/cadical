@@ -10,6 +10,7 @@ import sys
 import time
 from copy import deepcopy
 from pathlib import Path
+from distutils.util import strtobool
 
 from lark import Lark, Tree, Token
 
@@ -690,7 +691,7 @@ def parse_args():
     parser.add_argument('-E', '--eval', nargs='+', default=None, help='Evaluation mode: run eval for given schemes.')
 
     parser.add_argument('-R', '--score', type=str)
-    parser.add_argument('-s', '--STGP', type=bool)
+    parser.add_argument('-s', '--STGP', type=lambda x: bool(strtobool(x)))
     parser.add_argument('-M', '--monkeys', type=str)
     parser.add_argument('-L', '--load', nargs='+', default=None, help='Initialize from given schemes.')
     args = parser.parse_args()
