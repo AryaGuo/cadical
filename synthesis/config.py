@@ -21,8 +21,10 @@ class Config:
         self.report = 5
 
         # evaluation
-        self.time_lim = 60
-        self.threshold = 60
+        self.eval_time = 60
+        self.eval_threshold = 60
+        self.test_time = 5000
+        self.test_threshold = 5000
         self.eval = None
 
         # method

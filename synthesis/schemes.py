@@ -73,3 +73,9 @@ ratio = """
         if ( i >= 5 )
             ninc = lhs + 0 - 0.3 ;
 """
+
+par_37 = """
+        bumped = i + i / 16 + lhs - 0.5 * lhs / 6;
+        if ( i * 1024 == 0)
+            ninc = inc / 256 / 0.9 - i;
+"""

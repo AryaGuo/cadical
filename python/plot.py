@@ -38,7 +38,7 @@ def cactus_plot(args):
                         rtime.append(float(row['time']))
             rtime.sort()
             for i, j in enumerate(rtime):
-                if j > args.time_lim:
+                if j > args.eval_time:
                     break
                 px.append(i)
                 py.append(j)
@@ -61,14 +61,14 @@ def cactus_plot(args):
                     rtime.append(float(row['time']))
         rtime.sort()
         for i, j in enumerate(rtime):
-            if j > args.time_lim:
+            if j > args.eval_time:
                 break
             px.append(i)
             py.append(j)
         plt.plot(px, py, i_markers.__next__(), label=name if args.label else None, alpha=0.8, markersize=5)
 
     plt.xlim(0)
-    plt.ylim(0, args.time_lim)
+    plt.ylim(0, args.eval_time)
     plt.legend()
     plt.xlabel('Number of solved instances')
     plt.ylabel('Time (s)')
@@ -99,7 +99,7 @@ def gen_csv4all(args):
                 if row['verdict'] != 'UNKNOWN':
                     runtime.append(float(row['time']))
                 else:
-                    runtime.append(args.time_lim)
+                    runtime.append(args.eval_time)
             runtimes.append(runtime)
         if flag:
             flag = False

@@ -1,9 +1,8 @@
 export PROJ_DIR=$(realpath $(dirname $(dirname $0)))
-export DATA_DIR=$(realpath ~/Main-18/)
 
 python $PROJ_DIR/python/solvers.py \
 -S $PROJ_DIR/build/cadical \
--I $DATA_DIR \
+-I $PROJ_DIR/data/Main-18 \
 -O $PROJ_DIR/output \
 -N 16 \
 -T $1 \

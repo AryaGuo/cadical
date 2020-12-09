@@ -81,7 +81,7 @@ def main():
     parser.add_argument("-N", "--num_processes", default=16, type=int)
     parser.add_argument("-T", "--timeout", default=3600, type=float)
     parser.add_argument("-W", "--wait_timeout", default=10, type=int)
-    parser.add_argument("-P", "--problems", required=True, default=None, type=str)
+    parser.add_argument("-P", "--problems", type=str)
     parser.add_argument("-p", "--predict_folder", default="", type=str)
     parser.add_argument('-s', "--random_seed", default=1997, type=int)
     parser.add_argument('-X', "--arguments", type=str)
@@ -121,7 +121,6 @@ def main():
         else:
             for fin in Path(args.input_folder).rglob('*.cnf*'):
                 total_count += 1
-                # fout = output_root / '{}.txt'.format(fin.stem)
                 fout = str(output_root) + '/' + '{}.txt'.format(fin.stem)
                 pool.apply_async(worker, args=(total_count, fin, fout, args), callback=cal_result)
     except Exception as e:
