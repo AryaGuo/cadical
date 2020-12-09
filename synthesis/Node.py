@@ -1,6 +1,6 @@
 from lark import Tree, Token
 
-from synthesis.main import *
+from synthesis.config import cfg
 
 
 class Node:

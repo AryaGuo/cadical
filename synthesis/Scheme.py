@@ -1,7 +1,12 @@
+import logging
+import shutil
+import subprocess
+import sys
+
 from lark import Token
 
 from synthesis.Node import Node
-from synthesis.main import *
+from synthesis.config import cfg
 
 
 class Scheme:
@@ -130,14 +135,14 @@ class Scheme:
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()
-            process = subprocess.run('sh ../python/statistics.sh ' + str(output_dir) + ' ' + str(time_lim),
+            process = subprocess.run('sh ../python/statistics.sh ' + str(cfg.output_dir) + ' ' + str(time_lim),
                                      shell=True, check=True, capture_output=True)
             out = process.stdout.decode().strip()
             logging.info(out)
             out = out.splitlines()
             solved, cnt, rtime, ratio = int(out[0].split()[0]), int(out[0].split()[3]), float(
                 out[-1].split()[3][:-1]), float(out[-1].split()[-1][:-1])
-            csvfile = output_dir / (basename + '.csv')
+            csvfile = cfg.output_dir / (basename + '.csv')
             fitness = score(cfg.score)
             logging.info('Fitness = {}'.format(fitness))
             self.display()

@@ -138,6 +138,7 @@ if __name__ == '__main__':
 
     cur_time = time.strftime('%m%d-%H%M%S')
     output_dir = Path(cfg.output_root) / cur_time
+    cfg.output_dir = output_dir
     Path.mkdir(Path(cfg.output_root), exist_ok=True)
     Path.mkdir(output_dir, exist_ok=True)
 

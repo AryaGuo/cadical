@@ -1,10 +1,12 @@
 import collections
+import random
 from copy import deepcopy
 
 from lark import Lark, Token, Tree
 
 from synthesis.Node import Node
-from synthesis.main import *
+from synthesis.Scheme import Scheme
+from synthesis.config import cfg
 
 Rule_entry = collections.namedtuple('Rule_entry', ['name', 'op', 'is_name'])
 

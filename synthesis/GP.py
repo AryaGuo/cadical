@@ -1,9 +1,13 @@
+import logging
+import random
+import shutil
 from copy import deepcopy
 
 from lark import Lark
 
 from synthesis.DSL import DSL
-from synthesis.main import *
+from synthesis.Scheme import Scheme
+from synthesis.config import cfg
 
 
 class GP:
