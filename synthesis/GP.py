@@ -78,7 +78,9 @@ class GP:
         num = min(num, self.pop_size)
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
         tops = [(self.population[i].solved, self.population[i].fitness) for i in range(num)]
-        logging.info('Top {} in generation {}: {}'.format(num, self.generation, tops))
+        avg = sum(self.population[i].fitness for i in range(self.pop_size)) / self.pop_size
+        logging.info('Top {} in generation {}: {}; Avg = {}'.format(num, self.generation, tops, avg))
+        return tops, avg
 
     def get_winner(self):
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
@@ -87,7 +89,7 @@ class GP:
     def save(self, name):
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
         top = self.population[0]
-        shutil.copy(top.file, output_dir / (name + '.csv'))
+        shutil.copy(top.file, cfg.output_dir / (name + '.csv'))
 
     def __tournament_selection(self):
         rand_indices = random.sample(range(self.pop_size), self.tournament_size)

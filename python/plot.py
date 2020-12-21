@@ -116,7 +116,7 @@ def gen_csv4all(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-I', '--input_dir', required=True, type=str)
-    parser.add_argument('-T', '--time_lim', default=5000, type=float)
+    parser.add_argument('-T', '--eval_time', default=5000, type=float)
     parser.add_argument('-R', '--re', default='.*', type=str)
     parser.add_argument('-B', '--baseline', action='store_true')
     parser.add_argument('-D', '--baseline_dir', default='result/baseline', type=str)

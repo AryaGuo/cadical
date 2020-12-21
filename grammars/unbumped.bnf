@@ -1,0 +1,65 @@
+start: heuristic
+    | assign_unbumped
+    | assign_new_score
+    | expr
+    | sum
+    | prod
+    | atom
+    | bool_expr
+    | bool_sum
+    | bool_prod
+    | bool_atom
+    | condition
+    | bool
+    | bool_opr
+    | NUMBER
+    | POWER
+    | DECIMAL
+
+heuristic: assign_unbumped assign_new_score
+
+!assign_unbumped: condition? UNBUMPED "=" expr ";"
+!assign_new_score: BUMPED "=" expr ";"
+
+expr: sum
+!sum: prod
+    | sum "+" prod
+    | sum "-" prod
+!prod: atom
+    | prod "*" atom
+    | prod "/" atom
+!atom: NUMBER
+    | POWER
+    | DECIMAL
+    | CONFLICT_INDEX
+    | SCORE_INC
+    | "(" sum ")"
+    | LHS
+
+bool_expr: bool_sum
+!bool_sum: bool_prod
+    | bool_sum "+" bool_prod
+!bool_prod: bool_atom
+    | bool_prod "*" bool_atom
+    | bool_prod "%" bool_atom
+!bool_atom: NUMBER
+    | POWER
+    | CONFLICT_INDEX
+    | "(" bool_sum ")"
+
+!condition: "if" "(" bool ")"
+bool: bool_expr bool_opr bool_expr
+!bool_opr: "==" | ">="
+
+NUMBER: "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+POWER: "16" | "32" | "64" | "128" | "256" | "512" | "1024"
+DECIMAL: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7" | "0.8" | "0.9"
+CONFLICT_INDEX: "i"
+UNBUMPED: "unbumped"
+BUMPED: "bumped"
+SCORE_INC: "inc"
+LHS: "lhs"
+NEW_SCORE_INC: "ninc"
+
+%import common.WS
+%ignore WS

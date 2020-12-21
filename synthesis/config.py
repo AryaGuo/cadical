@@ -2,11 +2,11 @@ class Config:
     def __init__(self):
         # file paths
         self.output_root = '../result'
-        self.meta_file = 'bnf.bnf'
-        self.grammar_file = 'expr.bnf'
+        self.meta_file = '../grammars/bnf.bnf'
+        self.grammar_file = '../grammars/expr.bnf'
 
         # GP params
-        self.pop_size = 20
+        self.pop_size = 30
         self.depth_lim = 10
         self.tournament_size = 2
         self.elitism = True
@@ -24,7 +24,7 @@ class Config:
         self.eval_time = 60
         self.eval_threshold = 60
         self.test_time = 5000
-        self.test_threshold = 5000
+        self.test_threshold = 6000
         self.eval = None
 
         # method
@@ -32,6 +32,7 @@ class Config:
         self.STGP = False
         self.monkeys = None  # 'grammars.typed'
         self.load = None
+        self.config = '"--sat"'  # passed to Cadical
 
         self.wt = dict()
         self.wt['LHS'] = 1

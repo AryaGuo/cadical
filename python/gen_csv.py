@@ -8,35 +8,38 @@ def parse_output(solver, fout, baseline, timeout):
     rtime = None
     ans = 'UNKNOWN'
     score = None
-    if solver == 'cadical':
-        ff = fout.readlines()
-        for line in ff:
-            line_lst = line.split()
-            if len(line_lst) > 0 and line_lst[0] == 's':
-                ans = line_lst[1]
-                rtime = float(ff[-7].split()[-2])
-                score = rtime / baseline
-                break
-        if rtime is None:
-            score = timeout * 2 / baseline
-    elif solver == 'minisat':
-        ff = fout.readlines()
-        if len(ff) > 0:
-            sat = ff[-1].split()[-1]
-            if sat == 'SATISFIABLE' or sat == 'UNSATISFIABLE':
-                ans = sat
-                rtime = float(ff[-3].split()[-2])
-    elif solver == 'bmm':
-        ff = fout.readlines()
-        for (it, _) in enumerate(ff):
-            line = _.split()
-            if len(line) > 0 and line[0] == 's':
-                ans = line[1]
-                rtime = float(ff[it - 2].split()[-2])
-                break
-    else:
-        raise Exception('[parse_output] unknown solver')
-    return rtime, ans, score
+    with open(fout) as output:
+        if solver == 'cadical':
+            ff = output.readlines()
+            for line in ff:
+                line_lst = line.split()
+                if len(line_lst) > 0 and line_lst[0] == 's':
+                    ans = line_lst[1]
+                    rtime = float(ff[-7].split()[-2])
+                    if rtime < 0:
+                        return None, None, None
+                    score = rtime / baseline
+                    break
+            if rtime is None:
+                score = timeout * 2 / baseline
+        elif solver == 'minisat':
+            ff = output.readlines()
+            if len(ff) > 0:
+                sat = ff[-1].split()[-1]
+                if sat == 'SATISFIABLE' or sat == 'UNSATISFIABLE':
+                    ans = sat
+                    rtime = float(ff[-3].split()[-2])
+        elif solver == 'bmm':
+            ff = output.readlines()
+            for (it, _) in enumerate(ff):
+                line = _.split()
+                if len(line) > 0 and line[0] == 's':
+                    ans = line[1]
+                    rtime = float(ff[it - 2].split()[-2])
+                    break
+        else:
+            raise Exception('[parse_output] unknown solver')
+        return rtime, ans, score
 
 
 def main():
@@ -68,8 +71,10 @@ def main():
                 baseline = float(row['time'])
                 fout = Path(args.input_folder) / '{}.txt'.format(Path(data_name).stem)
                 if Path.exists(fout):
-                    with open(fout) as output:
-                        rtime, ans, score = parse_output(args.solver, output, baseline, args.timeout)
+                    for _ in range(10):
+                        rtime, ans, score = parse_output(args.solver, fout, baseline, args.timeout)
+                        if rtime is not None:
+                            break
                     writer.writerow({'data_point': data_name, 'verdict': ans, 'time': rtime, 'score': score})
                     total_count += 1
                     sum_score += score

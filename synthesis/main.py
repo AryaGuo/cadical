@@ -10,6 +10,9 @@ import time
 from distutils.util import strtobool
 from pathlib import Path
 
+import numpy as np
+from tensorboardX import SummaryWriter
+
 curPath = Path(__file__).resolve()
 sys.path.append(str(curPath.parents[1]))
 
@@ -27,6 +30,8 @@ def get_seed():
 
 
 def main():
+    writer = SummaryWriter('../runs/' + cur_time)
+
     if cfg.eval is not None:
         init_dataset(cfg.test_threshold)
         schemes = cfg.eval
@@ -42,10 +47,14 @@ def main():
         gp1.init_population(scheme_list=cfg.load)
         for i in range(cfg.epoch):
             logging.info('--- Epoch {} starts ---'.format(i))
-            gp1.report(cfg.report)
+            tops, avg = gp1.report(cfg.report)
             gp1.evolve()
             if i % cfg.save == 0:
                 gp1.save('epoch_{}'.format(i))
+            writer.add_scalar('best_fitness', np.array(tops[0][1]), i)
+            writer.add_scalar('best_solved', np.array(tops[0][0]), i)
+            writer.add_scalar('avg_fitness', avg, i)
+
         winner = gp1.get_winner()
         shutil.copy(winner.file, output_dir / 'winner.csv')
         logging.info('Winner: {}'.format(winner.file))
@@ -110,6 +119,8 @@ def init_dataset(time_lim):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-F', '--grammar_file', type=str)
+
     parser.add_argument('-O', '--output_root', type=str)
     parser.add_argument('-N', '--pop_size', type=int)
     parser.add_argument('-D', '--depth_lim', type=int)

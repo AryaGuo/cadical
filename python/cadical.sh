@@ -7,4 +7,4 @@ python $PROJ_DIR/python/solvers.py \
 -N 16 \
 -T $1 \
 -P $PROJ_DIR/python/problems.csv \
--X='--sat'
+-X=$2

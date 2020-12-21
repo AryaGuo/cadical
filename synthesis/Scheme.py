@@ -130,7 +130,8 @@ class Scheme:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
-            subprocess.run('cd .. ; sh python/cadical.sh ' + str(time_lim), shell=True, check=True,
+            subprocess.run('cd .. ; sh python/cadical.sh ' + str(time_lim) + ' ' + str(cfg.config), shell=True,
+                           check=True,
                            capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
@@ -138,7 +139,7 @@ class Scheme:
             process = subprocess.run('sh ../python/statistics.sh ' + str(cfg.output_dir) + ' ' + str(time_lim),
                                      shell=True, check=True, capture_output=True)
             out = process.stdout.decode().strip()
-            logging.info(out)
+            logging.info('[{}] {}'.format(basename, out))
             out = out.splitlines()
             solved, cnt, rtime, ratio = int(out[0].split()[0]), int(out[0].split()[3]), float(
                 out[-1].split()[3][:-1]), float(out[-1].split()[-1][:-1])
