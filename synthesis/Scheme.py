@@ -131,8 +131,7 @@ class Scheme:
             if not self.compile_cadical():
                 return 0, 0, 0, None  # Compilation error
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(time_lim) + ' ' + str(cfg.config), shell=True,
-                           check=True,
-                           capture_output=True)
+                           check=True, capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
                                       capture_output=True)
             basename = get_name.stdout.decode().strip()

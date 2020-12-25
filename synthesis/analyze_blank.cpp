@@ -118,7 +118,7 @@ namespace CaDiCaL {
     void Internal::bump_variable_score_inc() {
         assert(use_scores());
         assert(!evsids_limit_hit(score_inc));
-        double new_score_inc = 0;
+        double new_score_inc = 1;
         // insert assign_score_inc
 
 
