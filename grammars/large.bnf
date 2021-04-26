@@ -23,43 +23,70 @@ heuristic: assign_unbumped? assign_new_score assign_score_inc?
 !assign_new_score: BUMPED "=" expr ";"
 !assign_score_inc: condition? NEW_SCORE_INC "=" expr ";"
 
-?expr: sum
-!?sum: prod
+expr: sum
+!sum: prod
     | sum "+" prod
     | sum "-" prod
-!?prod: atom
+!prod: atom
     | prod "*" atom
     | prod "/" atom
-!?atom: NUMBER
+!atom: NUMBER
     | POWER
     | DECIMAL
-    | CONFLICT_INDEX
-    | SCORE_INC
     | "(" sum ")"
     | LHS
+    | num_var
 
-?bool_expr: bool_sum
-!?bool_sum: bool_prod
+!condition: "if" "(" logical_expr ")"
+
+!logical_expr: logical_atom
+    | logical_expr "&&" logical_atom
+    | logical_expr "||" logical_atom
+!logical_atom: bool_var
+    | "(" "!" bool_var "）"
+    | "(" logical_expr ")"
+    | "(" bool ")"
+
+bool: bool_expr bool_opr bool_expr
+!bool_opr: "==" | ">="
+
+bool_expr: bool_sum
+!bool_sum: bool_prod
     | bool_sum "+" bool_prod
-!?bool_prod: bool_atom
+!bool_prod: bool_atom
     | bool_prod "*" bool_atom
     | bool_prod "%" bool_atom
-!?bool_atom: NUMBER
+!bool_atom: NUMBER
     | POWER
     | CONFLICT_INDEX
     | "(" bool_sum ")"
 
-!condition: "if" "(" bool ")"
-bool: bool_expr bool_opr bool_expr
-!bool_opr: "==" | ">="
+num_var: LEVEL | MKS | FZ | PT | NT | SCORE_INC | CONFLICT_INDEX
+LEVEL: "level"
+MKS: "marks[idx]"
+FZ: "frozentab[idx]"
+PT: "ptab[idx]"
+NT: "ntab[idx]"
+SCORE_INC: "inc"
+CONFLICT_INDEX: "i"
+
+bool_var: UNSAT | ITER | LS | LA | PP | PR | FS | LP | STABLE | REP
+UNSAT: "unsat"
+ITER: "iterating"
+LS: "localsearching"
+LA: "lookingahead"
+PP: "preprocessing"
+PR: "protected_reasons"
+FS: "force_saved_phase"
+LP: "searching_lucky_phases"
+STABLE: "stable"
+REP: "reported"
 
 NUMBER: "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 POWER: "16" | "32" | "64" | "128" | "256" | "512" | "1024"
 DECIMAL: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7" | "0.8" | "0.9"
-CONFLICT_INDEX: "i"
 UNBUMPED: "unbumped"
 BUMPED: "bumped"
-SCORE_INC: "inc"
 LHS: "lhs"
 NEW_SCORE_INC: "ninc"
 

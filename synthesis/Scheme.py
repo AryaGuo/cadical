@@ -76,6 +76,7 @@ class Scheme:
         codes = [''] * 3
         term_subs = {'CONFLICT_INDEX': 'stats.conflicts', 'SCORE_INC': 'score_inc', 'UNBUMPED': 'stab[var]',
                      'BUMPED': 'new_score', 'NEW_SCORE_INC': 'new_score_inc'}
+
         for c in tree.children:
             if c.data == 'assign_unbumped':
                 term_subs['LHS'] = 'stab[var]'
@@ -129,7 +130,7 @@ class Scheme:
         try:
             self.embed_cadical(self.code)
             if not self.compile_cadical():
-                return 0, 0, 0, None  # Compilation error
+                return 0, 0, -sys.maxsize, None  # Compilation error
             subprocess.run('cd .. ; sh python/cadical.sh ' + str(time_lim) + ' ' + str(cfg.config), shell=True,
                            check=True, capture_output=True)
             get_name = subprocess.run('basename $(ls -td ../output/*/ | head -1)', shell=True, check=True,
