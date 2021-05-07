@@ -51,6 +51,9 @@ def main():
             gp1.evolve()
             if i % cfg.save == 0:
                 gp1.save('epoch_{}'.format(i))
+            if cfg.period is not 0:
+                if (cfg.epoch+1) % cfg.period == 0:
+                    gp1.dump()
             writer.add_scalar('best_fitness', np.array(tops[0][1]), i)
             writer.add_scalar('best_solved', np.array(tops[0][0]), i)
             writer.add_scalar('avg_fitness', avg, i)

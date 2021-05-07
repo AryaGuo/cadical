@@ -38,6 +38,10 @@ class Config:
         self.wt['LHS'] = 1
 
         self.OP_prob = 0.7
+        
+        # number of epoches to periodically save population records
+        self.period = 10
+        self.popfilename = 'population.json'
 
 
 cfg = Config()

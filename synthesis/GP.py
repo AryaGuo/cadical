@@ -1,7 +1,9 @@
 import logging
 import random
 import shutil
+import json
 from copy import deepcopy
+from pathlib import Path
 
 from lark import Lark
 
@@ -27,7 +29,14 @@ class GP:
     def init_population(self, scheme_list=None, eval_mode=False):
         assert self.generation == 0, self.generation
         self.generation = 1
-
+        load_file = Path(cfg.output_dir+'/'+cfg.popfilename)
+        
+        if load_file.is_file():
+            logging.info('Loading population from file: {} '.format(cfg.output_dir+'/'+cfg.popfilename))
+            with open(load_file, "r") as read_file:
+                self.population = json.loads(read_file)
+            return
+        
         if eval_mode:
             assert scheme_list is not None
             dsl_list = self.__load_schemes(scheme_list)
@@ -90,6 +99,11 @@ class GP:
         self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
         top = self.population[0]
         shutil.copy(top.file, cfg.output_dir / (name + '.csv'))
+        
+    def dump(self, name):
+        with open(cfg.output_dir+'/'+cfg.popfilename, 'w+') as f:
+            json.dumps(self.population, f)
+        
 
     def __tournament_selection(self):
         rand_indices = random.sample(range(self.pop_size), self.tournament_size)
