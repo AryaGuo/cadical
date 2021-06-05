@@ -8,7 +8,7 @@ args = parser.parse_args()
 
 cnt = 0
 
-input = 'python/main18.csv'
+input = 'python/main20result.csv'
 output = 'python/problems.csv'
 
 with open(input) as csvfile:
@@ -17,8 +17,8 @@ with open(input) as csvfile:
         writer = csv.DictWriter(fout, fieldnames=['data_point', 'time'])
         writer.writeheader()
         for row in reader:
-            if row['solver'] == 'CaDiCaL':
-                t = row['solver time']
+            if row['solver'] == 'CaDiCaL-sc2020':
+                t = row['time']
                 if float(t) <= args.threshold:
                     cnt += 1
                     writer.writerow({'data_point': Path(row['benchmark']).stem, 'time': t})
