@@ -40,7 +40,7 @@ class Config:
         self.OP_prob = 0.7
         
         # number of epoches to periodically save population records
-        self.period = 10
+        self.period = 1
         self.popfilename = 'population.json'
 
 

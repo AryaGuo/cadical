@@ -4,7 +4,7 @@ export DIRNAME=$(basename $BACKUPDIR)
 
 python $PROJ_DIR/python/gen_csv.py \
 -S "cadical" \
--D $PROJ_DIR/data/Main-18 \
+-D $PROJ_DIR/data/Main-20 \
 -I $BACKUPDIR \
 -O $1 \
 -N $DIRNAME \

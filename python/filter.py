@@ -22,6 +22,6 @@ with open(input) as csvfile:
                 if float(t) <= args.threshold:
                     cnt += 1
                     writer.writerow({'data_point': Path(row['benchmark']).stem, 'time': t})
-                    writer.writerow({'data_point': Path(row['benchmark']).name, 'time': t})
+                    writer.writerow({'data_point': Path(row['benchmark']).stem +'.xz', 'time': t})
 
 print(cnt)

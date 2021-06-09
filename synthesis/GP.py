@@ -29,10 +29,10 @@ class GP:
     def init_population(self, scheme_list=None, eval_mode=False):
         assert self.generation == 0, self.generation
         self.generation = 1
-        load_file = Path(cfg.output_dir+'/'+cfg.popfilename)
+        load_file = Path(str(cfg.output_dir)+'/'+cfg.popfilename)
         
         if load_file.is_file():
-            logging.info('Loading population from file: {} '.format(cfg.output_dir+'/'+cfg.popfilename))
+            logging.info('Loading population from file: {} '.format(str(cfg.output_dir)+'/'+cfg.popfilename))
             with open(load_file, "r") as read_file:
                 self.population = json.loads(read_file)
             return
